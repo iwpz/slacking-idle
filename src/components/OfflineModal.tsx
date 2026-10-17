@@ -31,10 +31,10 @@ export const OfflineModal: React.FC<OfflineModalProps> = ({
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
             <h2 className="font-display text-xl font-bold text-amber-400">
-              {isZh ? '离线挂机收益结算' : 'Offline Idle Gains Report'}
+              {isZh ? '离线收益' : 'Offline Gains'}
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              {isZh ? '挂机时长：' : 'Time Away: '}
+              {isZh ? '时长：' : 'Duration: '}
               <span className="font-mono text-slate-200">
                 {formatDuration(report.secondsElapsed, lang)}
               </span>
@@ -77,15 +77,11 @@ export const OfflineModal: React.FC<OfflineModalProps> = ({
 
         <div className="mt-4">
           <div className="text-xs font-medium text-slate-400 mb-2">
-            {isZh
-              ? 'NPC 自动采集与加工战利品明细：'
-              : 'Automated NPC & Combat Loot:'}
+            {isZh ? '产出明细' : 'Loot'}
           </div>
           {itemKeys.length === 0 ? (
             <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-center text-xs text-slate-400">
-              {isZh
-                ? '暂未雇佣采集/加工 NPC 或未开启自动战斗。雇佣 NPC 后离线可自动产出海量资源！'
-                : 'Hire NPCs or enable Combat to accumulate resources while offline.'}
+              {isZh ? '暂无离线产出' : 'No offline gains yet.'}
             </div>
           ) : (
             <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/80 p-3 grid grid-cols-2 gap-2">
@@ -132,7 +128,7 @@ export const OfflineModal: React.FC<OfflineModalProps> = ({
             onClick={onClose}
             className="rounded-lg bg-emerald-600 px-5 py-2 text-xs font-semibold text-white hover:bg-emerald-500 transition-colors whitespace-nowrap"
           >
-            {isZh ? '收下全部收益' : 'Claim All Rewards'}
+            {isZh ? '确定' : 'OK'}
           </button>
         </div>
       </div>

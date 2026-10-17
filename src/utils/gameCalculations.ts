@@ -295,11 +295,16 @@ export function canAffordEquipmentBlueprint(
   hasRare: boolean;
 } {
   const reqAct = state.activities[bp.requiredActivity];
-  const heroUnlocked = Boolean(
-    state.progression?.unlockedHeroes?.[bp.requiredClass]
+  const activityUnlocked = Boolean(
+    state.progression?.unlockedActivities?.[bp.requiredActivity]
   );
+  const heroUnlocked =
+    activityUnlocked ||
+    Boolean(state.progression?.unlockedHeroes?.[bp.requiredClass]);
   const unlocked =
-    heroUnlocked && tier <= reqAct.unlockedTier && reqAct.tiers[tier]?.unlocked;
+    activityUnlocked &&
+    tier <= reqAct.unlockedTier &&
+    reqAct.tiers[tier]?.unlocked;
 
   let hasMaterials = true;
   for (const inp of bp.inputs) {
@@ -618,28 +623,31 @@ export function getEnemyStatsForZoneStage(zone: Tier, stage: number) {
   const isBoss = stage === 10;
   const enemyCount = isBoss ? 1 : stage <= 3 ? 3 : stage <= 6 ? 4 : 5;
 
-  const stageScale = Math.pow(1.42, stage - 1);
+  // Stage gate multipliers at S4 (requires Hunter) and S7 (requires Mage)
+  const gateMult =
+    stage >= 7 ? 1.85 : stage >= 4 ? 1.35 : 1.0;
+  const stageScale = Math.pow(1.46, stage - 1) * gateMult;
 
   const singleEnemyMaxHp = isBoss
-    ? Math.max(110, Math.round(190 * stageScale * base))
-    : Math.max(30, Math.round(35 * stageScale * base));
+    ? Math.max(320, Math.round(420 * stageScale * base))
+    : Math.max(75, Math.round(80 * stageScale * base));
 
   const totalWaveMaxHp = singleEnemyMaxHp * enemyCount;
 
   const attack = Math.max(
-    3,
-    Math.round((isBoss ? 18 : 7.5) * stageScale * base)
+    6,
+    Math.round((isBoss ? 26 : 11) * stageScale * base)
   );
   const defense = Math.max(
     1,
-    Math.round((isBoss ? 8 : 2.5) * stageScale * base)
+    Math.round((isBoss ? 10 : 3) * stageScale * base)
   );
 
   const goldDrop = Math.max(
-    5,
-    Math.round(10 * stageScale * base * (isBoss ? 3.2 : 1.0))
+    6,
+    Math.round(12 * stageScale * base * (isBoss ? 3.5 : 1.0))
   );
-  const materialDropCount = Math.max(1, Math.round(1 + stage * 0.35));
+  const materialDropCount = Math.max(1, Math.round(1 + stage * 0.4));
 
   return {
     nameZh: isBoss

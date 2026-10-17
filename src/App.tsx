@@ -58,7 +58,7 @@ import {
 } from './utils/gameCalculations';
 import { soundFX } from './utils/sound';
 
-const SAVE_STORAGE_KEY = 'aethelgard_exponential_save_v8';
+const SAVE_STORAGE_KEY = 'aethelgard_exponential_save_v9';
 
 export default function App() {
   const [state, setState] = useState<GameState>(() => {
@@ -440,15 +440,20 @@ export default function App() {
             const targetHero = newEq.requiredClass;
             const currentEq = next.classLoadouts[targetHero][newEq.slot];
 
+            // Unlock the hero if this is their first forged equipment!
+            if (!prog.unlockedHeroes[targetHero]) {
+              prog.unlockedHeroes[targetHero] = true;
+            }
+
             // Auto-equip if the hero's slot is currently empty!
             if (!currentEq) {
               next.classLoadouts[targetHero][newEq.slot] = newEq;
               prog.unlockedTabs.combat = true;
+              prog.combatUnlocked = true;
             } else if (
               era.hasMasterArtificer &&
               newEq.tier === currentEq.tier
             ) {
-              // T4 Master Artificer: Automatically merge same-tier crafted gear into +1 Enhance Level!
               next.classLoadouts[targetHero][newEq.slot] = {
                 ...currentEq,
                 enhanceLevel: currentEq.enhanceLevel + 1,
@@ -458,7 +463,6 @@ export default function App() {
               era.hasMasterArtificer &&
               newEq.tier > currentEq.tier
             ) {
-              // Auto-upgrade to higher tier gear and preserve half enhance levels!
               next.classLoadouts[targetHero][newEq.slot] = {
                 ...newEq,
                 enhanceLevel: Math.floor(currentEq.enhanceLevel * 0.5),
@@ -482,17 +486,20 @@ export default function App() {
           }
         }
 
-        // 3. Progressive Onboarding Milestone Checks!
-        if (!prog.unlockedTabs.crafting && (next.resources.ore_1 || 0) >= 2) {
+        // 3. Granular Step-by-Step Progression Milestones!
+        // Step 1: Mine 3 Copper Ore -> Unlock Smithing (Refining tab)
+        if (!prog.unlockedTabs.crafting && (next.resources.ore_1 || 0) >= 3) {
           prog.unlockedTabs.crafting = true;
           prog.unlockedActivities.smithing = true;
           prog.craftingUnlocked = true;
         }
+        // Step 2: Smelt 3 Copper Ingots -> Unlock Equipment Forge (Warrior Blueprints)
         if (!prog.unlockedTabs.forge && (next.resources.ingot_1 || 0) >= 3) {
           prog.unlockedTabs.forge = true;
           prog.unlockedTabs.character = true;
           prog.forgeUnlocked = true;
         }
+        // Step 3: Craft 1 Warrior Gear -> Unlock Combat (Solo Warrior)
         if (
           !prog.unlockedTabs.combat &&
           (next.classLoadouts.warrior.weapon !== null ||
@@ -502,45 +509,87 @@ export default function App() {
           prog.unlockedTabs.combat = true;
           prog.combatUnlocked = true;
         }
+        // Shop unlocks once player has some gold or hires an NPC
         if (
           !prog.unlockedTabs.shop &&
           (era.totalHiredNpcs > 0 ||
-            next.gold >= 160 ||
-            next.combat.maxStageInHighestZone >= 4)
+            next.gold >= 180 ||
+            next.combat.maxStageInHighestZone >= 3)
         ) {
           prog.unlockedTabs.shop = true;
         }
-        // Zone 1 Stage 3+: Recruit Hunter + Unlock Logging & Carpentry!
+
+        // Step 4: Reach Zone 1 Stage 3 -> Unlock Logging ONLY!
         if (
-          !prog.unlockedHeroes.hunter &&
+          !prog.unlockedActivities.logging &&
           (next.combat.maxUnlockedZone > 1 ||
             next.combat.maxStageInHighestZone >= 3)
         ) {
-          prog.unlockedHeroes.hunter = true;
           prog.unlockedActivities.logging = true;
-          prog.unlockedActivities.carpentry = true;
           prog.loggingLineUnlocked = true;
         }
-        // Zone 1 Stage 6+: Recruit Mage + Unlock Foraging & Tailoring!
+        // Step 5: Gather 3 Wood -> Unlock Carpentry (and Hunter Blueprints in Forge!)
         if (
-          !prog.unlockedHeroes.mage &&
+          prog.unlockedActivities.logging &&
+          !prog.unlockedActivities.carpentry &&
+          (next.resources.wood_1 || 0) >= 3
+        ) {
+          prog.unlockedActivities.carpentry = true;
+        }
+        // Step 6: Craft a Hunter Gear (Bow or Leather Armor) -> Recruit Hunter!
+        if (
+          !prog.unlockedHeroes.hunter &&
+          (next.classLoadouts.hunter.weapon !== null ||
+            next.classLoadouts.hunter.armor !== null ||
+            next.equipmentBag.some((i) => i.requiredClass === 'hunter'))
+        ) {
+          prog.unlockedHeroes.hunter = true;
+        }
+
+        // Step 7: Reach Zone 1 Stage 6 (with Hunter recruited) -> Unlock Foraging ONLY!
+        if (
+          prog.unlockedHeroes.hunter &&
+          !prog.unlockedActivities.foraging &&
           (next.combat.maxUnlockedZone > 1 ||
             next.combat.maxStageInHighestZone >= 6)
         ) {
-          prog.unlockedHeroes.mage = true;
           prog.unlockedActivities.foraging = true;
-          prog.unlockedActivities.tailoring = true;
           prog.foragingLineUnlocked = true;
         }
-        // Defeat Zone 1 Boss (Stage 10 -> Zone 2 unlocked): Unlock Fishing, Cooking & Fishbone Altar!
+        // Step 8: Gather 3 Herb Fiber -> Unlock Tailoring (and Mage Blueprints in Forge!)
         if (
-          !prog.unlockedTabs.altar &&
+          prog.unlockedActivities.foraging &&
+          !prog.unlockedActivities.tailoring &&
+          (next.resources.fiber_1 || 0) >= 3
+        ) {
+          prog.unlockedActivities.tailoring = true;
+        }
+        // Step 9: Craft a Mage Gear (Staff or Cloth Robe) -> Recruit Mage!
+        if (
+          !prog.unlockedHeroes.mage &&
+          (next.classLoadouts.mage.weapon !== null ||
+            next.classLoadouts.mage.armor !== null ||
+            next.equipmentBag.some((i) => i.requiredClass === 'mage'))
+        ) {
+          prog.unlockedHeroes.mage = true;
+        }
+
+        // Step 10: Defeat Zone 1 Boss (Stage 10 -> Zone 2) -> Unlock Fishing!
+        if (
+          !prog.unlockedActivities.fishing &&
           (next.combat.maxUnlockedZone >= 2 || era.highestEraTier >= 2)
         ) {
-          prog.unlockedTabs.altar = true;
           prog.unlockedActivities.fishing = true;
-          prog.unlockedActivities.cooking = true;
           prog.fishingLineUnlocked = true;
+        }
+        // Step 11: Catch 3 Fish -> Unlock Cooking & Fishbone Altar!
+        if (
+          prog.unlockedActivities.fishing &&
+          !prog.unlockedActivities.cooking &&
+          ((next.resources.fish_1 || 0) >= 3 || era.highestEraTier >= 2)
+        ) {
+          prog.unlockedActivities.cooking = true;
+          prog.unlockedTabs.altar = true;
         }
 
         // 4. Run Shop Auto-Sell Pass once every 1.0 second
@@ -614,7 +663,7 @@ export default function App() {
               cls: 'warrior',
               timerKey: 'warriorAttackTimer',
               pulseKey: 'warriorAttackPulse',
-              tagZh: '战·顺劈',
+              tagZh: '战士',
               tagEn: 'WAR',
               color: '#f59e0b',
             },
@@ -622,7 +671,7 @@ export default function App() {
               cls: 'hunter',
               timerKey: 'hunterAttackTimer',
               pulseKey: 'hunterAttackPulse',
-              tagZh: '猎·狙击',
+              tagZh: '猎人',
               tagEn: 'HUN',
               color: '#34d399',
             },
@@ -630,7 +679,7 @@ export default function App() {
               cls: 'mage',
               timerKey: 'mageAttackTimer',
               pulseKey: 'mageAttackPulse',
-              tagZh: '法·群轰',
+              tagZh: '法师',
               tagEn: 'MAG',
               color: '#c084fc',
             },
@@ -699,13 +748,12 @@ export default function App() {
 
               const tag = next.language === 'zh' ? hInfo.tagZh : hInfo.tagEn;
               const aoeSuffix =
-                !isBoss && targetsHit > 1 ? ` (×${targetsHit})` : '';
-              const multiSuffix =
-                multistrikeCount > 1 ? ` [龙神3连]` : '';
+                !isBoss && targetsHit > 1 ? ` ×${targetsHit}` : '';
+              const multiSuffix = multistrikeCount > 1 ? ` 三连` : '';
               pushFloatingText(
                 isUltimateCast
-                  ? `★奥义·次元断罪★ -${formatCompact(dmg)}`
-                  : `[${tag}]${aoeSuffix}${multiSuffix} ${isCrit ? 'CRIT ' : ''}-${formatCompact(dmg)}`,
+                  ? `合击 -${formatCompact(dmg)}`
+                  : `${tag}${aoeSuffix}${multiSuffix} ${isCrit ? '暴击 ' : ''}-${formatCompact(dmg)}`,
                 isUltimateCast
                   ? '#f43f5e'
                   : isCrit
@@ -754,17 +802,36 @@ export default function App() {
                   'loot'
                 );
 
+                // Recover 35% HP on wave clear
+                next.combat.playerHp = Math.min(
+                  pStats.maxHp,
+                  next.combat.playerHp + Math.round(pStats.maxHp * 0.35)
+                );
+
+                // In Zone 1, gate advancing past S3 until Hunter joins, and past S6 until Mage joins
+                const z1StageCap =
+                  next.combat.currentZone === 1
+                    ? !prog.unlockedHeroes.hunter
+                      ? 3
+                      : !prog.unlockedHeroes.mage
+                        ? 6
+                        : 10
+                    : 10;
+
                 if (
                   next.combat.currentZone === next.combat.maxUnlockedZone &&
                   next.combat.stageInZone === next.combat.maxStageInHighestZone
                 ) {
-                  if (next.combat.maxStageInHighestZone < 10) {
+                  if (next.combat.maxStageInHighestZone < z1StageCap) {
                     next.combat.maxStageInHighestZone += 1;
                     if (next.combat.autoAdvance) {
                       next.combat.stageInZone =
                         next.combat.maxStageInHighestZone;
                     }
-                  } else if (next.combat.maxUnlockedZone < 8) {
+                  } else if (
+                    next.combat.maxStageInHighestZone >= 10 &&
+                    next.combat.maxUnlockedZone < 8
+                  ) {
                     next.combat.maxUnlockedZone = (next.combat.maxUnlockedZone +
                       1) as Tier;
                     next.combat.maxStageInHighestZone = 1;
@@ -775,7 +842,8 @@ export default function App() {
                   }
                 } else if (
                   next.combat.autoAdvance &&
-                  next.combat.stageInZone < 10
+                  next.combat.stageInZone <
+                    Math.min(next.combat.maxStageInHighestZone, z1StageCap)
                 ) {
                   next.combat.stageInZone += 1;
                 }
@@ -814,6 +882,7 @@ export default function App() {
 
               if (next.combat.playerHp <= 0) {
                 next.combat.playerHp = pStats.maxHp;
+                next.combat.autoAdvance = false;
                 if (next.combat.stageInZone > 1) {
                   next.combat.stageInZone -= 1;
                 }
@@ -1019,8 +1088,8 @@ export default function App() {
         if (perk) {
           showToast(
             prev.language === 'zh'
-              ? `★ 时代跃迁！已激活【${perk.eraNameZh} · ${perk.perkTitleZh}】！`
-              : `★ Era Unlocked: [${perk.eraNameEn} · ${perk.perkTitleEn}]!`
+              ? `解锁时代法则：${perk.eraNameZh} · ${perk.perkTitleZh}`
+              : `Unlocked: ${perk.eraNameEn} · ${perk.perkTitleEn}`
           );
         }
       }
@@ -1086,7 +1155,7 @@ export default function App() {
       combatPulseRef.current.mageAttackPulse = 1;
       combatPulseRef.current.enemyHitPulse = 1;
       pushFloatingText(
-        `★奥义·次元断罪★ -${formatCompact(ultDmg)}`,
+        `合击 -${formatCompact(ultDmg)}`,
         '#f43f5e',
         'enemy',
         true
@@ -1122,8 +1191,8 @@ export default function App() {
       } else {
         showToast(
           prev.language === 'zh'
-            ? `★ 创世摸鱼神碑第 ${nextStageNum}/3 阶段筑造完成！`
-            : `★ Monument Stage ${nextStageNum}/3 Completed!`
+            ? `摸鱼神碑 ${nextStageNum}/3 建造完成`
+            : `Monument Stage ${nextStageNum}/3 Built`
         );
       }
 
@@ -1215,6 +1284,10 @@ export default function App() {
         ...prev,
         progression: {
           ...prev.progression,
+          unlockedHeroes: {
+            ...prev.progression.unlockedHeroes,
+            [targetClass]: true,
+          },
           unlockedTabs: {
             ...prev.progression.unlockedTabs,
             combat: true,
@@ -1387,10 +1460,10 @@ export default function App() {
         <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-slate-300">
           {(
             [
-              { id: 'overview', zh: '全景视角', en: 'Overview' },
-              { id: 'gathering', zh: '采集矿林', en: 'Gathering' },
-              { id: 'crafting', zh: '工坊熔炉', en: 'Workshops' },
-              { id: 'combat', zh: '小队竞技场', en: 'Squad Arena' },
+              { id: 'overview', zh: '全景', en: 'Overview' },
+              { id: 'gathering', zh: '采集区', en: 'Gathering' },
+              { id: 'crafting', zh: '工坊区', en: 'Workshops' },
+              { id: 'combat', zh: '战场', en: 'Arena' },
             ] as { id: CameraFocusMode; zh: string; en: string }[]
           ).map((cam) => (
             <button
@@ -1430,10 +1503,10 @@ export default function App() {
               <span>
                 {state.progression.overdriveActive
                   ? isZh
-                    ? '超载狂欢中 ×100'
-                    : 'OVERDRIVE ×100'
+                    ? '超载 ×100'
+                    : 'Overdrive ×100'
                   : isZh
-                    ? '开启超载'
+                    ? '超载'
                     : 'Overdrive'}
               </span>
             </button>
@@ -1511,7 +1584,7 @@ export default function App() {
             className="flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400 transition-colors whitespace-nowrap shrink-0"
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>{isZh ? '离线挂机/存档' : 'Offline & Save'}</span>
+            <span>{isZh ? '存档' : 'Save'}</span>
           </button>
         </div>
       </header>
@@ -1658,32 +1731,21 @@ export default function App() {
         onOpenVictoryModal={() => setShowVictoryModal(true)}
       />
 
-      {/* VICTORY & ENDLESS CARNIVAL MODAL (When Monument Stage 3 is Completed!) */}
+      {/* VICTORY MODAL */}
       {showVictoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border-2 border-amber-400 bg-gradient-to-b from-[#131c31] via-[#0b111e] to-[#1a1033] p-6 text-slate-100 shadow-[0_0_50px_rgba(245,158,11,0.35)]">
-            <div className="flex items-center justify-between border-b border-amber-500/30 pb-3">
-              <div className="flex items-center gap-2">
-                <Crown className="w-6 h-6 text-amber-400" />
-                <h2 className="font-display text-xl font-bold text-amber-300">
-                  {isZh
-                    ? '★ 创世摸鱼神碑落成 · 荣耀通关证书 ★'
-                    : '★ Monument Complete · Victory Certificate ★'}
-                </h2>
-              </div>
-              <Sparkles className="w-5 h-5 text-purple-400" />
+          <div className="w-full max-w-md rounded-2xl border border-amber-400/80 bg-[#0b111e] p-6 text-slate-100 shadow-2xl">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+              <Crown className="w-5 h-5 text-amber-400" />
+              <h2 className="font-display text-lg font-bold text-amber-300">
+                {isZh ? '摸鱼神碑建成 · 通关留念' : 'Monument Complete'}
+              </h2>
             </div>
-
-            <p className="mt-3 text-xs leading-relaxed text-slate-300">
-              {isZh
-                ? '从最初孤身一人的战士挥镐挖下第一块铜矿石、亲手熔炼第一块铜锭，到集齐三职业传奇小队、激活八大时代逆天法则、开启超导光束与百倍星界超载——您已在这片浮空大陆完成了从零到无穷大的终极摸鱼伟业！'
-                : 'From a lone Warrior mining a single Copper Ore to commanding a 3-Hero Squad across 8 Paradigm Eras with Superconducting Beams and 100x Overdrive — you have completed the ultimate incremental journey!'}
-            </p>
 
             <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-800 bg-slate-900/90 p-4 font-mono text-xs">
               <div>
                 <div className="text-slate-400">
-                  {isZh ? '累计挣取总金币' : 'Total Gold Earned'}
+                  {isZh ? '累计金币' : 'Total Gold'}
                 </div>
                 <div className="text-base font-bold text-amber-400 mt-0.5">
                   {formatCompact(state.totalGoldEarned)} G
@@ -1691,7 +1753,7 @@ export default function App() {
               </div>
               <div>
                 <div className="text-slate-400">
-                  {isZh ? '小队当前综合秒伤' : 'Current Squad DPS'}
+                  {isZh ? '小队秒伤' : 'Squad DPS'}
                 </div>
                 <div className="text-base font-bold text-sky-400 mt-0.5">
                   {formatCompact(pStats.totalDps)} /s
@@ -1699,7 +1761,7 @@ export default function App() {
               </div>
               <div>
                 <div className="text-slate-400">
-                  {isZh ? '累计讨伐魔物总数' : 'Total Monsters Slain'}
+                  {isZh ? '击败怪物' : 'Monsters Slain'}
                 </div>
                 <div className="text-base font-bold text-rose-400 mt-0.5">
                   {formatCompact(state.combat.totalKills)}
@@ -1707,7 +1769,7 @@ export default function App() {
               </div>
               <div>
                 <div className="text-slate-400">
-                  {isZh ? '全服雇佣自动NPC' : 'Automated NPCs Hired'}
+                  {isZh ? '已雇佣帮工' : 'NPCs Hired'}
                 </div>
                 <div className="text-base font-bold text-emerald-400 mt-0.5">
                   {era.totalHiredNpcs} / 64
@@ -1715,7 +1777,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+            <div className="mt-5 flex items-center justify-end gap-2.5">
               <button
                 onClick={() => {
                   setState((p) => ({
@@ -1727,17 +1789,15 @@ export default function App() {
                   }));
                   setShowVictoryModal(false);
                 }}
-                className="rounded-lg bg-gradient-to-r from-amber-400 via-rose-500 to-purple-500 px-5 py-2 text-xs font-bold text-slate-950 hover:opacity-95"
+                className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400"
               >
-                {isZh
-                  ? '⚡ 开启无尽百倍超载狂欢模式继续爽玩'
-                  : '⚡ Continue in Endless 100x Overdrive'}
+                {isZh ? '开启超载继续挂机' : 'Continue with Overdrive'}
               </button>
               <button
                 onClick={() => setShowVictoryModal(false)}
                 className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700"
               >
-                {isZh ? '收起证书' : 'Close'}
+                {isZh ? '关闭' : 'Close'}
               </button>
             </div>
           </div>

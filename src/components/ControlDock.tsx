@@ -11,7 +11,6 @@ import {
   Lock,
   Pickaxe,
   Shield,
-  Sparkles,
   Store,
   Sword,
   Utensils,
@@ -106,25 +105,25 @@ interface ControlDockProps {
 }
 
 const ACTIVITY_UNLOCK_HINT_ZH: Record<ActivityId, string> = {
-  mining: '初始解锁（战士锻造线核心原料）',
-  smithing: '采集满 2 个铜矿石后自动解锁（熔炼铜锭）',
-  logging: '在【战斗】推进至第1阶 S3（猎人入队）后自动解锁',
-  carpentry: '在【战斗】推进至第1阶 S3（猎人入队）后自动解锁',
-  foraging: '在【战斗】推进至第1阶 S6（法师入队）后自动解锁',
-  tailoring: '在【战斗】推进至第1阶 S6（法师入队）后自动解锁',
-  fishing: '通关第1阶 Boss（S10）后自动解锁',
-  cooking: '通关第1阶 Boss（S10）后自动解锁',
+  mining: '初始解锁',
+  smithing: '采集 3 块铜矿石解锁',
+  logging: '战斗到达 S3 解锁',
+  carpentry: '采集 3 根原木解锁',
+  foraging: '战斗到达 S6 解锁',
+  tailoring: '采集 3 株草药解锁',
+  fishing: '击败 S10 领主解锁',
+  cooking: '钓起 3 条鱼解锁',
 };
 
 const ACTIVITY_UNLOCK_HINT_EN: Record<ActivityId, string> = {
-  mining: 'Unlocked at start (Warrior Forge Line)',
-  smithing: 'Unlocks automatically after mining 2 Copper Ore',
-  logging: 'Unlocks at Zone 1 Stage 3 when Hunter joins your squad',
-  carpentry: 'Unlocks at Zone 1 Stage 3 when Hunter joins your squad',
-  foraging: 'Unlocks at Zone 1 Stage 6 when Mage joins your squad',
-  tailoring: 'Unlocks at Zone 1 Stage 6 when Mage joins your squad',
-  fishing: 'Unlocks after defeating Zone 1 Boss (Stage 10)',
-  cooking: 'Unlocks after defeating Zone 1 Boss (Stage 10)',
+  mining: 'Unlocked',
+  smithing: 'Mine 3 Copper Ore',
+  logging: 'Reach Zone 1 S3',
+  carpentry: 'Gather 3 Logs',
+  foraging: 'Reach Zone 1 S6',
+  tailoring: 'Gather 3 Herbs',
+  fishing: 'Defeat Zone 1 Boss',
+  cooking: 'Catch 3 Fish',
 };
 
 export const ControlDock: React.FC<ControlDockProps> = ({
@@ -167,6 +166,15 @@ export const ControlDock: React.FC<ControlDockProps> = ({
 
   const era = getEraStatus(state);
   const prog = state.progression;
+  const maxTier = era.highestEraTier;
+
+  const getTierLabel = (t: Tier) => {
+    const meta = TIER_META[t];
+    if (t <= maxTier + 1) {
+      return `T${t} ${isZh ? meta.prefixZh : meta.prefixEn}`;
+    }
+    return isZh ? `T${t} ？？` : `T${t} ??`;
+  };
 
   const allGatheringIds: GatheringActivityId[] = [
     'mining',
@@ -185,90 +193,57 @@ export const ControlDock: React.FC<ControlDockProps> = ({
     ['warrior', 'hunter', 'mage'] as PlayerClass[]
   ).filter((c) => prog.unlockedHeroes[c]);
 
-  // Progressive onboarding banner helper
   const renderProgressionQuestBanner = () => {
-    let stepTitle = '';
-    let stepDesc = '';
-    let badgeText = '';
+    if (prog.unlockedTabs.altar) return null;
 
+    let stepTitle = '';
     if (!prog.unlockedTabs.crafting) {
-      badgeText = isZh ? '新手引导 1/6 · 矿工起步' : 'Step 1/6 · Mining Start';
-      stepTitle = isZh
-        ? '第一步：点击「采矿一次」收集 2 块铜矿石'
-        : 'Step 1: Click "Mine Once" to gather 2 Copper Ore';
-      stepDesc = isZh
-        ? '开局仅保留最纯粹的【战士锻造线】。先亲手挖掘铜矿石，满 2 块后将开启【锻造熔炼】！'
-        : 'Start with the pure Warrior Forge Line. Mine 2 Copper Ore to unlock Smithing!';
+      stepTitle = isZh ? '目标：采集 3 块铜矿石' : 'Goal: Gather 3 Copper Ore';
     } else if (!prog.unlockedTabs.forge) {
-      badgeText = isZh ? '新手引导 2/6 · 熔炼金属锭' : 'Step 2/6 · Smelting';
       stepTitle = isZh
-        ? '第二步：前往「通用耗材加工」熔炼 3 块铜锭'
-        : 'Step 2: Go to Refining & smelt 3 Copper Ingots';
-      stepDesc = isZh
-        ? '将铜矿石熔炼为铜锭（满 3 块），即可开启【战士武器与护甲制作】工坊！'
-        : 'Smelt 3 Copper Ingots to unlock the Warrior Weapon & Armor Forge!';
+        ? '目标：前往「加工」熔炼 3 块铜锭'
+        : 'Goal: Smelt 3 Copper Ingots in Refine';
     } else if (!prog.unlockedTabs.combat) {
-      badgeText = isZh ? '新手引导 3/6 · 打造战士重剑' : 'Step 3/6 · First Gear';
       stepTitle = isZh
-        ? '第三步：在「武器与护甲制作」打造并穿戴 1 件战士装备'
-        : 'Step 3: Craft & equip your first Warrior gear piece';
-      stepDesc = isZh
-        ? '为战士打造「铜重剑」或「铜重铠」并在【小队装备】中穿戴，即可正式出征【八阶战斗场所】！'
-        : 'Craft a Copper Greatsword or Plate Armor and equip it to unlock Combat!';
+        ? '目标：前往「锻造」打造 1 件战士装备'
+        : 'Goal: Craft 1 Warrior equipment in Forge';
+    } else if (!prog.unlockedActivities.logging) {
+      stepTitle = isZh
+        ? '目标：推进「战斗」至微风草甸 S3（解锁伐木）'
+        : 'Goal: Reach Zone 1 Stage 3 (Unlocks Logging)';
+    } else if (!prog.unlockedActivities.carpentry) {
+      stepTitle = isZh
+        ? '目标：前往「采集」伐木收集 3 根原木（解锁木工）'
+        : 'Goal: Gather 3 Logs in Gather (Unlocks Carpentry)';
     } else if (!prog.unlockedHeroes.hunter) {
-      badgeText = isZh ? '主线推进 4/6 · 招募猎人' : 'Step 4/6 · Recruit Hunter';
       stepTitle = isZh
-        ? '第四步：在「战斗」击败微风草甸 S2，解锁【猎人】与【伐木/工匠线】'
-        : 'Step 4: Clear Whispering Meadow S2 to unlock Hunter & Logging/Carpentry';
-      stepDesc = isZh
-        ? '推进战斗关卡至 S3，神射猎人将加入小队，并同步开放木材采集、木板加工与猎弓/皮甲制作！'
-        : 'Reach Zone 1 Stage 3 to recruit the Hunter and unlock Wood & Bow crafting!';
+        ? '目标：在「加工」制作木板，并在「锻造」打造猎弓或皮甲（解锁猎人）'
+        : 'Goal: Craft Planks & forge a Bow or Leather Armor (Recruits Hunter)';
+    } else if (!prog.unlockedActivities.foraging) {
+      stepTitle = isZh
+        ? '目标：推进「战斗」至微风草甸 S6（解锁采药）'
+        : 'Goal: Reach Zone 1 Stage 6 (Unlocks Foraging)';
+    } else if (!prog.unlockedActivities.tailoring) {
+      stepTitle = isZh
+        ? '目标：前往「采集」采药收集 3 株草药（解锁裁缝）'
+        : 'Goal: Gather 3 Herbs in Gather (Unlocks Tailoring)';
     } else if (!prog.unlockedHeroes.mage) {
-      badgeText = isZh ? '主线推进 5/6 · 招募法师' : 'Step 5/6 · Recruit Mage';
       stepTitle = isZh
-        ? '第五步：在「战斗」推进至 S6，解锁【法师】与【草药/裁缝线】'
-        : 'Step 5: Reach Zone 1 Stage 6 to unlock Mage & Foraging/Tailoring';
-      stepDesc = isZh
-        ? '推进战斗关卡至 S6，奥术法师将加入小队释放全屏AOE，并开放草药纤维与法杖/布甲制作！'
-        : 'Reach Zone 1 Stage 6 to recruit the AOE Mage and unlock Cloth & Staff crafting!';
-    } else if (!prog.unlockedTabs.altar) {
-      badgeText = isZh ? '主线推进 6/6 · 讨伐领主' : 'Step 6/6 · First Boss';
+        ? '目标：在「加工」织造布匹，并在「锻造」打造法杖或布甲（解锁法师）'
+        : 'Goal: Weave Cloth & forge a Staff or Cloth Armor (Recruits Mage)';
+    } else if (!prog.unlockedActivities.fishing) {
       stepTitle = isZh
-        ? '第六步：击败第1阶 S10 史莱姆王，解锁【钓鱼/烹饪】与【T2 工业共鸣纪元】！'
-        : 'Step 6: Defeat Zone 1 Boss (S10) to unlock Fishing, Cooking & Era T2!';
-      stepDesc = isZh
-        ? '集齐三职业小队，升级矿场与工坊雇佣自动NPC，击败史莱姆王开启全自动工业时代！'
-        : 'Assemble all 3 heroes, hire NPCs, and defeat the King Slime to enter Era T2!';
+        ? '目标：击败微风草甸 S10 领主（解锁钓鱼）'
+        : 'Goal: Defeat Zone 1 Boss (Unlocks Fishing)';
     } else {
-      const currentPerk = ERA_PERKS.find((p) => p.tier === era.highestEraTier)!;
-      const nextPerk = ERA_PERKS.find(
-        (p) => p.tier === ((era.highestEraTier + 1) as Tier)
-      );
-      badgeText = isZh
-        ? `${currentPerk.eraNameZh} · ${currentPerk.perkTitleZh}`
-        : `${currentPerk.eraNameEn} · ${currentPerk.perkTitleEn}`;
-      stepTitle = isZh ? currentPerk.perkDescZh : currentPerk.perkDescEn;
-      stepDesc = nextPerk
-        ? isZh
-          ? `下一纪元预告（解锁任意 T${nextPerk.tier} 产线激活）：【${nextPerk.perkTitleZh}】— ${nextPerk.perkDescZh}`
-          : `Next Era (Unlock any T${nextPerk.tier} node): [${nextPerk.perkTitleEn}] — ${nextPerk.perkDescEn}`
-        : isZh
-          ? '已登顶 T8 星界超载纪元！前往【时代与神碑】开启百倍超载或建造创世摸鱼神碑！'
-          : 'Max T8 Astral Era reached! Open [Era & Monument] for 100x Overdrive & Finale Monument!';
+      stepTitle = isZh
+        ? '目标：前往「采集」钓起 3 条鱼（解锁烹饪与圣坛）'
+        : 'Goal: Catch 3 Fish (Unlocks Cooking & Altar)';
     }
 
     return (
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-gradient-to-r from-amber-500/15 via-slate-900/95 to-purple-500/15 px-3.5 py-2 text-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 min-w-0">
-          <span className="inline-flex items-center gap-1 rounded bg-amber-500 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-950 shrink-0 w-fit">
-            <Sparkles className="w-3 h-3" />
-            {badgeText}
-          </span>
-          <span className="font-bold text-amber-200 truncate">{stepTitle}</span>
-        </div>
-        <div className="text-[11px] text-slate-300 truncate max-w-full">
-          {stepDesc}
-        </div>
+      <div className="mb-2.5 flex items-center justify-between rounded-lg border border-amber-500/30 bg-slate-900/90 px-3 py-1.5 text-xs">
+        <span className="font-semibold text-amber-300">{stepTitle}</span>
       </div>
     );
   };
@@ -278,7 +253,6 @@ export const ControlDock: React.FC<ControlDockProps> = ({
     onSelect: (t: Tier) => void,
     activityList: ActivityId[]
   ) => {
-    // Only show T2-T8 tabs once the player has unlocked at least 2 activities or unlocked T2, keeping the first few minutes super clean
     const showMultiTiers =
       era.highestEraTier >= 2 ||
       prog.unlockedHeroes.hunter ||
@@ -288,8 +262,8 @@ export const ControlDock: React.FC<ControlDockProps> = ({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#111827] px-3 py-2">
         <div className="flex items-center gap-1.5 overflow-x-auto">
           {(showMultiTiers ? TIERS : ([1] as Tier[])).map((t) => {
-            const meta = TIER_META[t];
             const isSelected = activeTier === t;
+            const isFutureMasked = t > maxTier + 1;
             const unlockedCount = activityList.filter(
               (id) =>
                 prog.unlockedActivities[id] &&
@@ -317,10 +291,8 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                       : 'border-slate-800/80 bg-slate-900/60 text-slate-500 hover:text-slate-300'
                 }`}
               >
-                <span className="font-mono">
-                  T{t} {isZh ? meta.prefixZh : meta.prefixEn}
-                </span>
-                {autoCount > 0 ? (
+                <span className="font-mono">{getTierLabel(t)}</span>
+                {!isFutureMasked && autoCount > 0 ? (
                   <span
                     className={`rounded px-1 py-0.2 text-[10px] font-mono ${
                       isSelected
@@ -329,7 +301,6 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                     }`}
                   >
                     {autoCount}/{totalAvailInTier}
-                    {isZh ? '自动' : 'Auto'}
                   </span>
                 ) : unlockedCount === 0 ? (
                   <Lock className="w-3 h-3 opacity-60" />
@@ -343,8 +314,8 @@ export const ControlDock: React.FC<ControlDockProps> = ({
           {era.hasIndustrialSynergy && (
             <span className="text-[11px] font-mono text-emerald-400 hidden md:inline">
               {isZh
-                ? `★ 工业共鸣：全服 ${era.totalHiredNpcs} 名NPC → +${(era.synergyCritChance * 100).toFixed(0)}% 双倍暴击率`
-                : `★ Synergy: ${era.totalHiredNpcs} NPCs → +${(era.synergyCritChance * 100).toFixed(0)}% Double Yield`}
+                ? `双倍产出率 +${(era.synergyCritChance * 100).toFixed(0)}%`
+                : `2x Yield +${(era.synergyCritChance * 100).toFixed(0)}%`}
             </span>
           )}
           <div className="flex items-center rounded border border-slate-700 bg-slate-900 p-0.5 text-xs font-mono">
@@ -371,31 +342,21 @@ export const ControlDock: React.FC<ControlDockProps> = ({
     const cfg = ACTIVITY_CONFIG[id];
     const tierMeta = TIER_META[tier];
 
-    // Check if the activity line itself is still locked in progressive onboarding
     if (!prog.unlockedActivities[id]) {
       return (
         <div
           key={`${id}_${tier}_locked_line`}
-          className="flex flex-col justify-between rounded-lg border border-slate-800/70 bg-slate-950/60 p-4 text-slate-400"
+          className="flex items-center justify-between rounded-lg border border-slate-800/70 bg-slate-950/60 p-4 text-slate-400"
         >
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-sm font-bold text-slate-300 flex items-center gap-2">
-                <Lock className="w-4 h-4 text-slate-500" />
-                <span>
-                  {isZh ? `${cfg.nameZh}产线` : `${cfg.nameEn} Line`}
-                </span>
-              </h3>
-              <span className="font-mono text-[11px] text-slate-500">
-                {isZh ? '随主线进度解锁' : 'Progressive Unlock'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-2">
-              {isZh
-                ? `解锁条件：${ACTIVITY_UNLOCK_HINT_ZH[id]}`
-                : `Unlock Condition: ${ACTIVITY_UNLOCK_HINT_EN[id]}`}
-            </p>
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-slate-500" />
+            <span className="font-display text-sm font-bold text-slate-300">
+              {isZh ? cfg.nameZh : cfg.nameEn}
+            </span>
           </div>
+          <span className="text-xs text-slate-500">
+            {isZh ? ACTIVITY_UNLOCK_HINT_ZH[id] : ACTIVITY_UNLOCK_HINT_EN[id]}
+          </span>
         </div>
       );
     }
@@ -407,7 +368,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
       ? CRAFTING_RECIPES.find((r) => r.activity === id)
       : null;
 
-    // If this specific Tier is not yet unlocked for this activity
+    // Locked Tier Card
     if (!node.unlocked) {
       const prevUnlocked =
         tier === 1 || act.tiers[(tier - 1) as Tier]?.unlocked;
@@ -415,71 +376,49 @@ export const ControlDock: React.FC<ControlDockProps> = ({
         750 * TIER_META[(tier - 1) as Tier].baseMultiplier
       );
       const canAffordUnlock = prevUnlocked && state.gold >= unlockCost;
-      const eraPerkForTier = ERA_PERKS.find((p) => p.tier === tier);
+      const isMasked = tier > maxTier + 1;
 
       return (
         <div
           key={`${id}_${tier}`}
           className="flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#111827]/90 p-4 text-slate-200"
         >
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-base font-bold text-white flex items-center gap-2">
-                <Lock className="w-4 h-4 text-amber-400" />
-                <span>
-                  T{tier}{' '}
-                  {isZh
-                    ? `${tierMeta.prefixZh} · ${cfg.nameZh}`
-                    : `${tierMeta.prefixEn} ${cfg.nameEn}`}
-                </span>
-              </h3>
-              {eraPerkForTier && tier > era.highestEraTier && (
-                <span className="rounded bg-purple-500/20 border border-purple-400/40 px-2 py-0.5 font-mono text-[10px] text-purple-300">
-                  {isZh
-                    ? `首开激活：${eraPerkForTier.perkTitleZh}`
-                    : `Unlocks Era: ${eraPerkForTier.perkTitleEn}`}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-400 mt-1.5">
-              {isZh
-                ? `解锁后开启独立的【T${tier} ${tierMeta.prefixZh}${cfg.nameZh}】产线（可独立雇佣 T${tier} 专属 NPC），之前 T1~T${tier - 1} 的产线将继续在后台全速并行产出！`
-                : `Unlocks independent T${tier} ${tierMeta.prefixEn} ${cfg.nameEn} production line while T1-T${tier - 1} keep running in parallel!`}
-            </p>
-            {eraPerkForTier && tier > era.highestEraTier && (
-              <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
-                <span className="font-bold">
-                  {isZh
-                    ? `★ 首次解锁任意 T${tier} 产线将永久激活【${eraPerkForTier.eraNameZh} · ${eraPerkForTier.perkTitleZh}】：`
-                    : `★ First T${tier} unlock activates [${eraPerkForTier.perkTitleEn}]: `}
-                </span>
-                {isZh ? eraPerkForTier.perkDescZh : eraPerkForTier.perkDescEn}
-              </div>
-            )}
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-base font-bold text-white flex items-center gap-2">
+              <Lock className="w-4 h-4 text-amber-400" />
+              <span>
+                {isMasked
+                  ? `T${tier} ？？`
+                  : `T${tier} ${isZh ? `${tierMeta.prefixZh} · ${cfg.nameZh}` : `${tierMeta.prefixEn} ${cfg.nameEn}`}`}
+              </span>
+            </h3>
+            <span className="font-mono text-xs text-slate-500">
+              {isMasked ? '？？' : isZh ? '未解锁' : 'Locked'}
+            </span>
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-400 font-mono">
               {!prevUnlocked
                 ? isZh
-                  ? `需先解锁 T${tier - 1} ${cfg.nameZh}`
-                  : `Unlock T${tier - 1} ${cfg.nameEn} first`
-                : isZh
-                  ? `解锁费用：${formatCompact(unlockCost)} 金币`
-                  : `Unlock Cost: ${formatCompact(unlockCost)} Gold`}
+                  ? `需先解锁 T${tier - 1}`
+                  : `Unlock T${tier - 1} first`
+                : `${formatCompact(unlockCost)} G`}
             </span>
             <button
               disabled={!canAffordUnlock}
               onClick={() => onUpgradeActivityTier(id, tier, 'unlockTier')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
                 canAffordUnlock
                   ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
                   : 'bg-slate-800 text-slate-500 cursor-not-allowed'
               }`}
             >
-              {isZh
-                ? `解锁 T${tier} ${cfg.nameZh} (${formatCompact(unlockCost)} G)`
-                : `Unlock T${tier} (${formatCompact(unlockCost)} G)`}
+              {isMasked
+                ? '？？'
+                : isZh
+                  ? `解锁 (${formatCompact(unlockCost)} G)`
+                  : `Unlock (${formatCompact(unlockCost)} G)`}
             </button>
           </div>
         </div>
@@ -500,39 +439,27 @@ export const ControlDock: React.FC<ControlDockProps> = ({
         key={`${id}_${tier}`}
         className={`flex flex-col justify-between rounded-lg border p-3.5 text-slate-100 ${
           metrics.isSuperconducting
-            ? 'border-cyan-500/60 bg-gradient-to-br from-[#0f172a] via-[#111827] to-cyan-950/30 shadow-[0_0_20px_rgba(34,211,238,0.12)]'
+            ? 'border-cyan-500/60 bg-gradient-to-br from-[#0f172a] via-[#111827] to-cyan-950/30'
             : 'border-slate-800 bg-[#111827]'
         }`}
       >
         <div>
           <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-display text-base font-bold text-white">
-                  T{tier}{' '}
-                  {isZh
-                    ? `${tierMeta.prefixZh}${cfg.nameZh}`
-                    : `${tierMeta.prefixEn} ${cfg.nameEn}`}
-                </h3>
-                <span className="text-xs font-mono text-amber-400">
-                  Lv.{costs.nodeTotalLevel}{' '}
-                  {node.npcHired
-                    ? isZh
-                      ? `[自动运转]`
-                      : `[Auto]`
-                    : isZh
-                      ? `[手动·完成+${formatCompact(Math.round(3 * tierMeta.baseMultiplier))}G]`
-                      : `[Manual +${formatCompact(Math.round(3 * tierMeta.baseMultiplier))}G]`}
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-display text-base font-bold text-white">
+                T{tier}{' '}
+                {isZh
+                  ? `${tierMeta.prefixZh} · ${cfg.nameZh}`
+                  : `${tierMeta.prefixEn} ${cfg.nameEn}`}
+              </h3>
+              <span className="text-xs font-mono text-amber-400">
+                Lv.{costs.nodeTotalLevel}
+              </span>
+              {metrics.isSuperconducting && (
+                <span className="rounded bg-cyan-500/20 border border-cyan-400/50 px-1.5 py-0.2 font-mono text-[10px] font-bold text-cyan-300">
+                  {isZh ? '极速' : 'MAX'}
                 </span>
-                {metrics.isSuperconducting && (
-                  <span className="rounded bg-cyan-500/20 border border-cyan-400/50 px-1.5 py-0.2 font-mono text-[10px] font-bold text-cyan-300">
-                    {isZh ? '⚡超导光束 20次/秒' : '⚡SOLID BEAM'}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
-                {isZh ? cfg.descZh : cfg.descEn}
-              </p>
+              )}
             </div>
 
             <button
@@ -552,42 +479,35 @@ export const ControlDock: React.FC<ControlDockProps> = ({
             >
               {node.npcHired
                 ? isZh
-                  ? `自动${cfg.nameZh}中`
-                  : `Auto ${cfg.nameEn}`
+                  ? '自动中'
+                  : 'Auto'
                 : node.isRunning
                   ? isZh
-                    ? `点击加速 ${(node.progress * 100).toFixed(0)}% (+12%)`
-                    : `Tap Boost ${(node.progress * 100).toFixed(0)}% (+12%)`
+                    ? `加速 ${(node.progress * 100).toFixed(0)}%`
+                    : `Boost ${(node.progress * 100).toFixed(0)}%`
                   : isZh
-                    ? `${cfg.nameZh}一次`
-                    : `${cfg.nameEn} Once`}
+                    ? cfg.nameZh
+                    : cfg.nameEn}
             </button>
           </div>
 
           <div className="mt-2.5">
             <div className="flex items-center justify-between text-xs text-slate-300 mb-1">
               <span className="font-mono tabular-nums">
-                {isZh ? '周期' : 'Cycle'}: {metrics.duration.toFixed(2)}s ·{' '}
-                {isZh ? '单次产量' : 'Yield'}:{' '}
+                {metrics.duration.toFixed(2)}s ·{' '}
                 <span className="text-emerald-400 font-bold">
                   ×{formatCompact(metrics.yieldPerCycle)}
                 </span>
-                {metrics.overflowYieldMult > 1.01 && (
-                  <span className="text-cyan-300 ml-1">
-                    (溢出×{metrics.overflowYieldMult.toFixed(1)})
-                  </span>
-                )}
               </span>
               <span className="font-mono text-amber-300 tabular-nums">
-                {isZh ? '稀有率' : 'Rare'}:{' '}
-                {(metrics.rareChance * 100).toFixed(1)}%
+                {isZh ? '稀有' : 'Rare'} {(metrics.rareChance * 100).toFixed(1)}
+                %
               </span>
             </div>
 
-            {/* Progress Bar OR T6+ Superconducting Solid Beam */}
-            <div className="h-2.5 w-full overflow-hidden rounded-sm bg-slate-900 border border-slate-800 relative">
+            <div className="h-2 w-full overflow-hidden rounded-sm bg-slate-900 border border-slate-800 relative">
               {metrics.isSuperconducting ? (
-                <div className="h-full w-full bg-gradient-to-r from-cyan-400 via-purple-400 to-amber-300 animate-pulse shadow-[0_0_12px_#22d3ee]" />
+                <div className="h-full w-full bg-gradient-to-r from-cyan-400 via-purple-400 to-amber-300" />
               ) : (
                 <div
                   className="h-full bg-amber-500 transition-transform duration-75 origin-left"
@@ -600,17 +520,17 @@ export const ControlDock: React.FC<ControlDockProps> = ({
           </div>
 
           {!isCrafting ? (
-            <div className="mt-2.5 rounded border border-slate-800/80 bg-slate-900/70 px-2.5 py-2 text-xs">
+            <div className="mt-2.5 rounded border border-slate-800/80 bg-slate-900/70 px-2.5 py-1.5 text-xs">
               <div className="flex items-center justify-between text-slate-300">
                 <span>
                   {id === 'mining' &&
-                    `${getResourceName(`ore_${tier}`, state.language)}: ${formatCompact(state.resources[`ore_${tier}`] || 0)} (${isZh ? '单价' : 'Val'} ${formatCompact(getResourceUnitPrice(`ore_${tier}`))}G)`}
+                    `${getResourceName(`ore_${tier}`, state.language)}: ${formatCompact(state.resources[`ore_${tier}`] || 0)}`}
                   {id === 'logging' &&
-                    `${getResourceName(`wood_${tier}`, state.language)}: ${formatCompact(state.resources[`wood_${tier}`] || 0)} (${isZh ? '单价' : 'Val'} ${formatCompact(getResourceUnitPrice(`wood_${tier}`))}G)`}
+                    `${getResourceName(`wood_${tier}`, state.language)}: ${formatCompact(state.resources[`wood_${tier}`] || 0)}`}
                   {id === 'fishing' &&
-                    `${getResourceName(`fish_${tier}`, state.language)}: ${formatCompact(state.resources[`fish_${tier}`] || 0)} + ${isZh ? '鱼骨头' : 'Fishbones'}`}
+                    `${getResourceName(`fish_${tier}`, state.language)}: ${formatCompact(state.resources[`fish_${tier}`] || 0)}`}
                   {id === 'foraging' &&
-                    `${getResourceName(`fiber_${tier}`, state.language)}: ${formatCompact(state.resources[`fiber_${tier}`] || 0)} / ${isZh ? '糖' : 'Sugar'}(${formatCompact(state.resources.sugar || 0)})`}
+                    `${getResourceName(`fiber_${tier}`, state.language)}: ${formatCompact(state.resources[`fiber_${tier}`] || 0)} · ${isZh ? '糖' : 'Sugar'}: ${formatCompact(state.resources.sugar || 0)}`}
                 </span>
                 <span className="font-mono text-sky-300">
                   {isZh ? rareInfo.nameZh : rareInfo.nameEn}:{' '}
@@ -620,17 +540,8 @@ export const ControlDock: React.FC<ControlDockProps> = ({
             </div>
           ) : (
             currentRecipe && (
-              <div className="mt-2.5 rounded border border-slate-800/80 bg-slate-900/70 px-2.5 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
+              <div className="mt-2.5 rounded border border-slate-800/80 bg-slate-900/70 px-2.5 py-1.5 text-xs flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2 text-slate-300">
-                  <span className="text-slate-400">
-                    {era.hasZeroCostRefining
-                      ? isZh
-                        ? '★T5零损耗免原料:'
-                        : '★T5 Zero-Cost:'
-                      : isZh
-                        ? '消耗:'
-                        : 'In:'}
-                  </span>
                   {currentRecipe.inputs.map((inp, idx) => {
                     const k = inp.isTiered
                       ? `${inp.itemKey}_${tier}`
@@ -646,8 +557,8 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                         {getResourceName(k, state.language)}{' '}
                         {era.hasZeroCostRefining
                           ? isZh
-                            ? '免消耗'
-                            : 'FREE'
+                            ? '免耗材'
+                            : '0'
                           : `${formatCompact(have)}/${inp.amount}`}
                       </span>
                     );
@@ -665,37 +576,26 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                       `${currentRecipe.output.itemKey}_${tier}`
                     ] || 0
                   )}
-                  ) · {isZh ? '单价' : 'Val'}{' '}
-                  {formatCompact(
-                    getResourceUnitPrice(
-                      `${currentRecipe.output.itemKey}_${tier}`
-                    )
-                  )}
-                  G
+                  )
                 </div>
               </div>
             )
           )}
         </div>
 
-        {/* Bottom Row: Per-Tier Dedicated NPC + 3 Smooth Level Upgrades */}
-        <div className="mt-3 pt-2.5 border-t border-slate-800/90 space-y-2">
+        <div className="mt-2.5 pt-2 border-t border-slate-800/90 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-slate-300 truncate">
-              T{tier} {isZh ? cfg.npcNameZh : cfg.npcNameEn}{' '}
+              {isZh ? cfg.npcNameZh : cfg.npcNameEn}{' '}
               {node.npcHired ? (
                 <span className="font-mono text-emerald-400">
-                  (Lv.{node.npcLevel})
+                  Lv.{node.npcLevel}
                 </span>
               ) : (
                 <span
-                  className={`font-mono ${costs.canUnlockNpc ? 'text-emerald-400' : 'text-amber-400'}`}
+                  className={`font-mono ${costs.canUnlockNpc ? 'text-emerald-400' : 'text-slate-500'}`}
                 >
-                  (
-                  {isZh
-                    ? `需总等级 Lv.${costs.npcUnlockLevel} · 当前 ${costs.nodeTotalLevel}/${costs.npcUnlockLevel}`
-                    : `Req Lv.${costs.npcUnlockLevel} · Now ${costs.nodeTotalLevel}/${costs.npcUnlockLevel}`}
-                  )
+                  (Lv.{costs.nodeTotalLevel}/{costs.npcUnlockLevel})
                 </span>
               )}
             </span>
@@ -713,11 +613,11 @@ export const ControlDock: React.FC<ControlDockProps> = ({
               >
                 {!costs.canUnlockNpc
                   ? isZh
-                    ? `差 ${costs.npcUnlockLevel - costs.nodeTotalLevel} 级解锁NPC (${formatCompact(costs.npcHireCost)} G)`
-                    : `Need +${costs.npcUnlockLevel - costs.nodeTotalLevel} Lv (${formatCompact(costs.npcHireCost)} G)`
+                    ? `需 Lv.${costs.npcUnlockLevel}`
+                    : `Req Lv.${costs.npcUnlockLevel}`
                   : isZh
-                    ? `雇佣 T${tier} 自动NPC (${formatCompact(costs.npcHireCost)} G)`
-                    : `Hire T${tier} NPC (${formatCompact(costs.npcHireCost)} G)`}
+                    ? `雇佣 (${formatCompact(costs.npcHireCost)} G)`
+                    : `Hire (${formatCompact(costs.npcHireCost)} G)`}
               </button>
             ) : (
               <button
@@ -731,8 +631,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}
               >
-                {isZh ? '升级NPC' : 'Up NPC'} (
-                {formatCompact(costs.npcUpgradeCost)} G)
+                {isZh ? '升级' : 'Up'} ({formatCompact(costs.npcUpgradeCost)} G)
               </button>
             )}
           </div>
@@ -782,7 +681,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
               }`}
             >
               <span className="whitespace-nowrap">
-                {isZh ? '稀有率' : 'Rare'} Lv.{node.rareDropLevel}
+                {isZh ? '稀有' : 'Rare'} Lv.{node.rareDropLevel}
               </span>
               <span className="font-mono text-[11px] text-amber-400 tabular-nums">
                 {formatCompact(costs.rareDropCost)} G
@@ -822,9 +721,15 @@ export const ControlDock: React.FC<ControlDockProps> = ({
   const currentlyEquippedInSlot =
     state.classLoadouts[selectedBp.requiredClass][selectedBp.slot];
 
-  // Only show blueprints for unlocked heroes
   const availableBlueprints = EQUIPMENT_BLUEPRINTS.filter(
-    (bp) => prog.unlockedHeroes[bp.requiredClass]
+    (bp) =>
+      prog.unlockedActivities[bp.requiredActivity] ||
+      prog.unlockedHeroes[bp.requiredClass]
+  );
+  const forgeClassesAvailable: PlayerClass[] = (
+    ['warrior', 'hunter', 'mage'] as PlayerClass[]
+  ).filter((c) =>
+    availableBlueprints.some((bp) => bp.requiredClass === c)
   );
   const filteredBlueprints =
     forgeClassFilter === 'all'
@@ -832,6 +737,11 @@ export const ControlDock: React.FC<ControlDockProps> = ({
       : availableBlueprints.filter(
           (bp) => bp.requiredClass === forgeClassFilter
         );
+
+  const showEraTab =
+    prog.unlockedTabs.altar ||
+    era.highestEraTier >= 2 ||
+    prog.unlockedHeroes.mage;
 
   return (
     <div
@@ -842,7 +752,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
           : 'translate(0, 0)',
       }}
     >
-      {/* Top Tab Bar (Progressive Unlocks) + Zen Collapse Handle */}
+      {/* Top Tab Bar */}
       <div className="flex items-center justify-between gap-2 rounded-t-xl border border-b-0 border-slate-700/90 bg-[#0b111e] px-3 py-2">
         <div className="flex items-center gap-1.5 overflow-x-auto">
           <button
@@ -854,7 +764,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
             }`}
           >
             <Pickaxe className="w-3.5 h-3.5" />
-            <span>{isZh ? '采集原材料' : 'Gathering'}</span>
+            <span>{isZh ? '采集' : 'Gather'}</span>
           </button>
 
           {prog.unlockedTabs.crafting && (
@@ -867,7 +777,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
               }`}
             >
               <Hammer className="w-3.5 h-3.5" />
-              <span>{isZh ? '通用耗材加工' : 'Refining'}</span>
+              <span>{isZh ? '加工' : 'Refine'}</span>
             </button>
           )}
 
@@ -881,13 +791,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
               }`}
             >
               <Anvil className="w-3.5 h-3.5" />
-              <span>
-                {isZh
-                  ? unlockedHeroesList.length === 1
-                    ? '战士武器与护甲制作'
-                    : '小队武器与护甲制作'
-                  : 'Gear Forge'}
-              </span>
+              <span>{isZh ? '锻造' : 'Forge'}</span>
             </button>
           )}
 
@@ -903,8 +807,8 @@ export const ControlDock: React.FC<ControlDockProps> = ({
               <Shield className="w-3.5 h-3.5" />
               <span>
                 {isZh
-                  ? `小队装备与仓库 (${state.equipmentBag.length})`
-                  : `Squad & Bag (${state.equipmentBag.length})`}
+                  ? `装备 (${state.equipmentBag.length})`
+                  : `Squad (${state.equipmentBag.length})`}
               </span>
             </button>
           )}
@@ -919,11 +823,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
               }`}
             >
               <Sword className="w-3.5 h-3.5" />
-              <span>
-                {isZh
-                  ? `八阶战斗 (第${state.combat.currentZone}阶·${unlockedHeroesList.length}人队)`
-                  : `Combat (Z${state.combat.currentZone}·${unlockedHeroesList.length}Hero)`}
-              </span>
+              <span>{isZh ? '战斗' : 'Combat'}</span>
             </button>
           )}
 
@@ -937,7 +837,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
               }`}
             >
               <Store className="w-3.5 h-3.5" />
-              <span>{isZh ? '商会与自动卖出' : 'Shop & Auto-Sell'}</span>
+              <span>{isZh ? '商会' : 'Shop'}</span>
             </button>
           )}
 
@@ -951,26 +851,23 @@ export const ControlDock: React.FC<ControlDockProps> = ({
               }`}
             >
               <Fish className="w-3.5 h-3.5" />
-              <span>{isZh ? '鱼骨圣坛' : 'Fishbone Altar'}</span>
+              <span>{isZh ? '圣坛' : 'Altar'}</span>
             </button>
           )}
 
-          {/* ERA PERKS & ENDGAME MONUMENT TAB */}
-          <button
-            onClick={() => onSelectTab('monument')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
-              state.activeTab === 'monument'
-                ? 'bg-purple-500 text-white'
-                : 'text-purple-300 hover:bg-slate-800'
-            }`}
-          >
-            <Crown className="w-3.5 h-3.5" />
-            <span>
-              {isZh
-                ? `时代法则与终局神碑 (T${era.highestEraTier})`
-                : `Eras & Monument (T${era.highestEraTier})`}
-            </span>
-          </button>
+          {showEraTab && (
+            <button
+              onClick={() => onSelectTab('monument')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                state.activeTab === 'monument'
+                  ? 'bg-purple-500 text-white'
+                  : 'text-purple-300 hover:bg-slate-800'
+              }`}
+            >
+              <Crown className="w-3.5 h-3.5" />
+              <span>{isZh ? '时代法则' : 'Era Rules'}</span>
+            </button>
+          )}
         </div>
 
         <button
@@ -981,12 +878,12 @@ export const ControlDock: React.FC<ControlDockProps> = ({
           {state.dockCollapsed ? (
             <>
               <ChevronUp className="w-3.5 h-3.5" />
-              <span>{isZh ? '展开控制台 (H)' : 'Expand Dock (H)'}</span>
+              <span>{isZh ? '展开 (H)' : 'Expand (H)'}</span>
             </>
           ) : (
             <>
               <ChevronDown className="w-3.5 h-3.5" />
-              <span>{isZh ? '全景模式 (H)' : 'Zen Mode (H)'}</span>
+              <span>{isZh ? '收起 (H)' : 'Hide (H)'}</span>
             </>
           )}
         </button>
@@ -1013,7 +910,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
             </div>
           )}
 
-          {/* TAB 2: GENERAL CONSUMABLE REFINING */}
+          {/* TAB 2: REFINING */}
           {state.activeTab === 'crafting' && (
             <div>
               {renderTierSubTabBar(
@@ -1029,16 +926,16 @@ export const ControlDock: React.FC<ControlDockProps> = ({
             </div>
           )}
 
-          {/* TAB 3: DEDICATED WEAPON & ARMOR FORGE UI (WITH T4 AUTO-FORGE & AUTO-MERGE) */}
+          {/* TAB 3: FORGE */}
           {state.activeTab === 'forge' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
               <div className="lg:col-span-5 space-y-2">
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-xs font-bold text-slate-300">
-                    {isZh ? '已解锁英雄图纸：' : 'Unlocked Hero Blueprints:'}
+                    {isZh ? '图纸' : 'Blueprints'}
                   </span>
                   <div className="flex items-center gap-1">
-                    {unlockedHeroesList.length > 1 && (
+                    {forgeClassesAvailable.length > 1 && (
                       <button
                         onClick={() => setForgeClassFilter('all')}
                         className={`px-2 py-0.5 rounded text-xs font-medium ${
@@ -1047,12 +944,10 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                             : 'bg-slate-800 text-slate-400 hover:text-white'
                         }`}
                       >
-                        {isZh
-                          ? `全部(${availableBlueprints.length})`
-                          : `All(${availableBlueprints.length})`}
+                        {isZh ? '全部' : 'All'}
                       </button>
                     )}
-                    {unlockedHeroesList.map((c) => (
+                    {forgeClassesAvailable.map((c) => (
                       <button
                         key={c}
                         onClick={() => setForgeClassFilter(c)}
@@ -1071,11 +966,6 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                 <div className="space-y-1.5 max-h-60 overflow-y-auto pr-0.5">
                   {filteredBlueprints.map((bp) => {
                     const isSelected = bp.id === forge.selectedBlueprintId;
-                    const actUnlockedTier =
-                      state.activities[bp.requiredActivity].unlockedTier;
-                    const reqActName = isZh
-                      ? ACTIVITY_CONFIG[bp.requiredActivity].nameZh
-                      : ACTIVITY_CONFIG[bp.requiredActivity].nameEn;
                     const eqInSlot =
                       state.classLoadouts[bp.requiredClass][bp.slot];
 
@@ -1089,24 +979,15 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                             : 'border-slate-800 bg-[#111827] text-slate-300 hover:border-slate-700'
                         }`}
                       >
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold truncate">
-                            {isZh ? bp.nameZh : bp.nameEn}
-                          </div>
-                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                            {isZh ? bp.descZh : bp.descEn}
-                          </div>
+                        <div className="text-xs font-bold truncate">
+                          {isZh ? bp.nameZh : bp.nameEn}
                         </div>
-                        <div className="text-right shrink-0 font-mono text-[11px]">
-                          <div className="text-amber-400">
-                            {reqActName} T{actUnlockedTier}
-                          </div>
-                          <div className="text-slate-400">
-                            {isZh ? '现穿:' : 'Eq:'}{' '}
-                            {eqInSlot
-                              ? `T${eqInSlot.tier}${eqInSlot.enhanceLevel > 0 ? `+${eqInSlot.enhanceLevel}` : ''}`
-                              : '无'}
-                          </div>
+                        <div className="text-right shrink-0 font-mono text-[11px] text-slate-400">
+                          {eqInSlot
+                            ? `T${eqInSlot.tier}${eqInSlot.enhanceLevel > 0 ? `+${eqInSlot.enhanceLevel}` : ''}`
+                            : isZh
+                              ? '未装备'
+                              : 'None'}
                         </div>
                       </button>
                     );
@@ -1120,19 +1001,23 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-display text-base font-bold text-white">
-                          {isZh ? previewGear.nameZh : previewGear.nameEn}
+                          {forge.selectedTier > maxTier + 1
+                            ? `T${forge.selectedTier} ？？`
+                            : isZh
+                              ? previewGear.nameZh
+                              : previewGear.nameEn}
                         </h3>
                         <span className="text-xs text-amber-400 font-semibold">
                           ·{' '}
                           {isZh
-                            ? `${CLASS_CONFIG[selectedBp.requiredClass].nameZh} (${CLASS_CONFIG[selectedBp.requiredClass].roleTitleZh})`
-                            : `${CLASS_CONFIG[selectedBp.requiredClass].nameEn} (${CLASS_CONFIG[selectedBp.requiredClass].roleTitleEn})`}
+                            ? CLASS_CONFIG[selectedBp.requiredClass].nameZh
+                            : CLASS_CONFIG[selectedBp.requiredClass].nameEn}
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">
                         {isZh
-                          ? `独立读条耗时 ${selectedBp.fixedDuration.toFixed(1)} 秒 · 制作一次获得 1 件 · 现穿：${currentlyEquippedInSlot ? `T${currentlyEquippedInSlot.tier} ${currentlyEquippedInSlot.nameZh} (+${currentlyEquippedInSlot.enhanceLevel})` : '未穿戴'}`
-                          : `Fixed ${selectedBp.fixedDuration.toFixed(1)}s cast · Crafts 1 item · Current: ${currentlyEquippedInSlot ? `T${currentlyEquippedInSlot.tier} (+${currentlyEquippedInSlot.enhanceLevel})` : 'None'}`}
+                          ? `当前穿戴：${currentlyEquippedInSlot ? `T${currentlyEquippedInSlot.tier} ${currentlyEquippedInSlot.nameZh}${currentlyEquippedInSlot.enhanceLevel > 0 ? ` +${currentlyEquippedInSlot.enhanceLevel}` : ''}` : '无'}`
+                          : `Equipped: ${currentlyEquippedInSlot ? `T${currentlyEquippedInSlot.tier} (+${currentlyEquippedInSlot.enhanceLevel})` : 'None'}`}
                       </p>
                     </div>
 
@@ -1142,10 +1027,11 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                           state.activities[selectedBp.requiredActivity].tiers[t]
                             ?.unlocked;
                         const active = t === forge.selectedTier;
+                        const isMasked = t > maxTier + 1;
                         return (
                           <button
                             key={t}
-                            disabled={forge.isCrafting}
+                            disabled={forge.isCrafting || isMasked}
                             onClick={() => onSelectForgeTier(t)}
                             className={`px-2 py-1 rounded text-xs font-mono font-semibold transition-colors ${
                               active
@@ -1155,7 +1041,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                                   : 'bg-slate-900 text-slate-600'
                             }`}
                           >
-                            T{t}
+                            {isMasked ? '？？' : `T${t}`}
                           </button>
                         );
                       })}
@@ -1165,15 +1051,15 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                   {!forgeCheck.unlocked && (
                     <div className="mt-3 rounded border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
                       {isZh
-                        ? `尚未解锁 T${forge.selectedTier} 制作权限！请先在【通用耗材加工】中切换至 T${forge.selectedTier} 页签并解锁【T${forge.selectedTier} ${reqActConfig.nameZh}】。`
-                        : `Requires T${forge.selectedTier} ${reqActConfig.nameEn} unlocked in the Refining tab!`}
+                        ? `需先在「加工」中解锁 T${forge.selectedTier} ${reqActConfig.nameZh}`
+                        : `Unlock T${forge.selectedTier} ${reqActConfig.nameEn} in Refining first`}
                     </div>
                   )}
 
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="rounded border border-slate-800 bg-slate-900/80 p-3">
                       <div className="text-xs font-semibold text-slate-400 mb-1.5">
-                        {isZh ? '所需耗材：' : 'Required Materials:'}
+                        {isZh ? '所需材料' : 'Materials'}
                       </div>
                       <div className="space-y-1">
                         {selectedBp.inputs.map((inp, idx) => {
@@ -1219,11 +1105,11 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                         >
                           {forge.useRare
                             ? isZh
-                              ? '★ 已注入神话材料 (3.2倍属性)'
-                              : '★ Mythic Infused (3.2x)'
+                              ? '已附加稀有材料'
+                              : 'Rare Active'
                             : isZh
-                              ? '注入稀有材料'
-                              : 'Infuse Rare Mat'}
+                              ? '附加稀有材料'
+                              : 'Add Rare'}
                         </button>
                       </div>
                     </div>
@@ -1231,42 +1117,42 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                     <div className="rounded border border-slate-800 bg-slate-900/80 p-3">
                       <div className="text-xs font-semibold text-slate-400 mb-1.5">
                         {isZh
-                          ? `T${forge.selectedTier}${forgeTierMeta.prefixZh} 成品属性与小队乘区：`
-                          : `T${forge.selectedTier} ${forgeTierMeta.prefixEn} Stats & Multipliers:`}
+                          ? `T${forge.selectedTier} ${forgeTierMeta.prefixZh} 属性`
+                          : `T${forge.selectedTier} Stats`}
                       </div>
                       <div className="grid grid-cols-2 gap-y-1 text-xs font-mono tabular-nums text-slate-200">
                         <div>
-                          {isZh ? '攻击力:' : 'ATK:'}{' '}
+                          {isZh ? '攻击:' : 'ATK:'}{' '}
                           <span className="text-sky-400 font-bold">
                             +{formatCompact(previewGear.attack)}
                           </span>
                         </div>
                         <div>
-                          {isZh ? '防御力:' : 'DEF:'}{' '}
+                          {isZh ? '防御:' : 'DEF:'}{' '}
                           <span className="text-emerald-400 font-bold">
                             +{formatCompact(previewGear.defense)}
                           </span>
                         </div>
                         <div>
-                          {isZh ? '最大生命:' : 'HP:'}{' '}
+                          {isZh ? '生命:' : 'HP:'}{' '}
                           <span className="text-rose-400 font-bold">
                             +{formatCompact(previewGear.maxHp)}
                           </span>
                         </div>
                         <div>
-                          {isZh ? '破甲增伤:' : 'ArmorBrk:'}{' '}
+                          {isZh ? '破甲:' : 'Brk:'}{' '}
                           <span className="text-amber-300">
                             +{(previewGear.armorBreak * 100).toFixed(0)}%
                           </span>
                         </div>
                         <div>
-                          {isZh ? '战利品率:' : 'LootDrop:'}{' '}
+                          {isZh ? '掉落:' : 'Loot:'}{' '}
                           <span className="text-emerald-300">
                             +{(previewGear.lootBonus * 100).toFixed(0)}%
                           </span>
                         </div>
                         <div>
-                          {isZh ? '金币倍率:' : 'GoldMult:'}{' '}
+                          {isZh ? '金币:' : 'Gold:'}{' '}
                           <span className="text-purple-300">
                             +{(previewGear.goldBonus * 100).toFixed(0)}%
                           </span>
@@ -1280,16 +1166,11 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 mb-1.5">
                     <span className="font-mono">
                       {forge.isCrafting
-                        ? isZh
-                          ? `独立读条制作中... ${(forge.progress * 100).toFixed(0)}%`
-                          : `Crafting Gear... ${(forge.progress * 100).toFixed(0)}%`
-                        : isZh
-                          ? `独立读条耗时：${selectedBp.fixedDuration.toFixed(1)} 秒 (产出后若未穿戴将自动穿戴，同阶装备在T4后自动合成+1)`
-                          : `Independent Cast Time: ${selectedBp.fixedDuration.toFixed(1)}s`}
+                        ? `${(forge.progress * 100).toFixed(0)}%`
+                        : `${selectedBp.fixedDuration.toFixed(1)}s`}
                     </span>
 
-                    {/* T4 Era Perk: Auto-Forge & Auto-Synthesis Toggle */}
-                    {era.hasMasterArtificer ? (
+                    {era.hasMasterArtificer && (
                       <button
                         onClick={onToggleAutoForge}
                         className={`px-2.5 py-1 rounded text-xs font-bold border transition-colors ${
@@ -1299,15 +1180,9 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                         }`}
                       >
                         {isZh
-                          ? `★ T4神匠自动锻造与合成: ${forge.autoForge ? 'ON' : 'OFF'}`
-                          : `★ T4 Auto-Forge & Merge: ${forge.autoForge ? 'ON' : 'OFF'}`}
+                          ? `自动锻造: ${forge.autoForge ? '开启' : '关闭'}`
+                          : `Auto-Forge: ${forge.autoForge ? 'ON' : 'OFF'}`}
                       </button>
-                    ) : (
-                      <span className="text-[11px] text-slate-500">
-                        {isZh
-                          ? '（解锁 T4 秘银纪元后可开启全自动锻造与吞噬合成+N）'
-                          : '(Unlock T4 Mythril Era for Auto-Forge & Merge)'}
-                      </span>
                     )}
                   </div>
 
@@ -1340,12 +1215,10 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                       }`}
                     >
                       {forge.isCrafting
-                        ? isZh
-                          ? `制作中 ${(forge.progress * 100).toFixed(0)}%`
-                          : `Crafting ${(forge.progress * 100).toFixed(0)}%`
+                        ? `${(forge.progress * 100).toFixed(0)}%`
                         : isZh
-                          ? '制作一次 (获得 1 件)'
-                          : 'Craft 1 Equipment'}
+                          ? '锻造'
+                          : 'Craft'}
                     </button>
                   </div>
                 </div>
@@ -1353,13 +1226,15 @@ export const ControlDock: React.FC<ControlDockProps> = ({
             </div>
           )}
 
-          {/* TAB 4: COMBAT & 8 EXPONENTIAL ZONES */}
+          {/* TAB 4: COMBAT */}
           {state.activeTab === 'combat' && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                 {COMBAT_ZONES.map((z) => {
                   const isCurrent = state.combat.currentZone === z.zone;
                   const isUnlocked = z.zone <= state.combat.maxUnlockedZone;
+                  const isNext = z.zone === state.combat.maxUnlockedZone + 1;
+
                   return (
                     <button
                       key={z.zone}
@@ -1374,16 +1249,17 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between text-xs font-bold">
-                        <span>{isZh ? `第${z.zone}阶` : `Zone ${z.zone}`}</span>
-                        <span className="font-mono text-[10px] text-amber-400">
-                          ×{formatCompact(z.baseMultiplier)}
+                        <span>
+                          {isUnlocked
+                            ? `T${z.zone}`
+                            : isNext
+                              ? `T${z.zone} ${isZh ? TIER_META[z.zone].prefixZh : TIER_META[z.zone].prefixEn}`
+                              : `T${z.zone}`}
                         </span>
+                        {!isUnlocked && <Lock className="w-3 h-3 opacity-60" />}
                       </div>
                       <div className="text-xs font-semibold truncate mt-0.5">
-                        {isZh ? z.nameZh : z.nameEn}
-                      </div>
-                      <div className="font-mono text-[10px] text-slate-400 mt-1 truncate">
-                        {z.rangeLabel}
+                        {isUnlocked ? (isZh ? z.nameZh : z.nameEn) : '？？'}
                       </div>
                     </button>
                   );
@@ -1396,16 +1272,12 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-white">
-                        {isZh
-                          ? `${currentZoneInfo.nameZh} · ${currentZoneInfo.rangeLabel}`
-                          : `${currentZoneInfo.nameEn} · ${currentZoneInfo.rangeLabel}`}
+                        {isZh ? currentZoneInfo.nameZh : currentZoneInfo.nameEn}
+                      </span>
+                      <span className="font-mono text-xs text-slate-400">
+                        {state.combat.stageInZone}/10
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {isZh
-                        ? '第1阶 S3 解锁【猎人】，S6 解锁【法师】，S10 击败领主开启下一阶！'
-                        : 'Z1 S3 unlocks Hunter, S6 unlocks Mage, S10 Boss unlocks the next Zone!'}
-                    </p>
 
                     <div className="mt-2.5 grid grid-cols-5 gap-1.5">
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stg) => {
@@ -1449,11 +1321,11 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                     >
                       {state.combat.isFighting
                         ? isZh
-                          ? '战斗进行中 (点击暂停)'
+                          ? '战斗中 (点击暂停)'
                           : 'Fighting (Pause)'
                         : isZh
-                          ? '▶ 点击开始出征战斗'
-                          : '▶ Start Combat'}
+                          ? '开始战斗'
+                          : 'Start'}
                     </button>
 
                     <button
@@ -1464,29 +1336,32 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                           : 'border-slate-700 bg-slate-800 text-slate-400'
                       }`}
                     >
-                      {isZh ? '自动推进关卡' : 'Auto-Advance'}:{' '}
-                      {state.combat.autoAdvance ? 'ON' : 'OFF'}
+                      {isZh ? '自动推进' : 'Auto'}:{' '}
+                      {state.combat.autoAdvance
+                        ? isZh
+                          ? '开启'
+                          : 'ON'
+                        : isZh
+                          ? '关闭'
+                          : 'OFF'}
                     </button>
                   </div>
                 </div>
 
-                {/* Col 2: Squad Specialization, Attack Bars & T3 Ultimate Bar */}
+                {/* Col 2: Squad Attack Bars */}
                 <div className="rounded-lg border border-slate-800 bg-[#111827] p-3 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between text-xs font-bold text-white mb-2">
                       <span>
                         {state.combat.stageInZone === 10
-                          ? isZh
-                            ? '★ 领主Boss战 (猎人185%克制)'
-                            : '★ Boss Fight (Hunter 185%)'
+                          ? 'BOSS'
                           : isZh
-                            ? `小怪群波次 (${state.combat.enemiesAlive}/${state.combat.enemyCount}只)`
-                            : `Mob Wave (${state.combat.enemiesAlive}/${state.combat.enemyCount})`}
+                            ? `怪物 (${state.combat.enemiesAlive}/${state.combat.enemyCount})`
+                            : `Mobs (${state.combat.enemiesAlive}/${state.combat.enemyCount})`}
                       </span>
                       <span className="font-mono text-amber-400">
-                        {isZh
-                          ? `T${pStats.resonanceTier}共鸣 ×${pStats.resonanceMult.toFixed(2)}`
-                          : `T${pStats.resonanceTier} Res ×${pStats.resonanceMult.toFixed(2)}`}
+                        T{pStats.resonanceTier} ×
+                        {pStats.resonanceMult.toFixed(2)}
                       </span>
                     </div>
 
@@ -1497,32 +1372,19 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                             cls: 'warrior' as PlayerClass,
                             timer: state.combat.warriorAttackTimer,
                             color: 'bg-amber-500',
-                            specText: isZh
-                              ? '上前顺劈3怪 / Boss 125%'
-                              : 'Cleave 3 / Boss 125%',
                             unlockHint: '',
                           },
                           {
                             cls: 'hunter' as PlayerClass,
                             timer: state.combat.hunterAttackTimer,
                             color: 'bg-emerald-500',
-                            specText: isZh
-                              ? '远程射箭 / Boss 185%重创'
-                              : 'Ranged / Boss 185%',
-                            unlockHint: isZh
-                              ? '第1阶 S3 解锁入队'
-                              : 'Unlocks at Z1 S3',
+                            unlockHint: isZh ? '打造猎弓/皮甲入队' : 'Craft Bow/Leather',
                           },
                           {
                             cls: 'mage' as PlayerClass,
                             timer: state.combat.mageAttackTimer,
                             color: 'bg-purple-500',
-                            specText: isZh
-                              ? '魔法投射 / 全屏5怪 115%'
-                              : 'Magic / All 5 Mobs 115%',
-                            unlockHint: isZh
-                              ? '第1阶 S6 解锁入队'
-                              : 'Unlocks at Z1 S6',
+                            unlockHint: isZh ? '打造法杖/布甲入队' : 'Craft Staff/Cloth',
                           },
                         ] as const
                       ).map((row) => {
@@ -1549,13 +1411,10 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                           <div key={row.cls}>
                             <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
                               <span className="font-sans font-semibold text-white">
-                                {isZh ? cfg.nameZh : cfg.nameEn}{' '}
-                                <span className="text-slate-400 font-mono">
-                                  ATK {formatCompact(h.attack)}
-                                </span>
+                                {isZh ? cfg.nameZh : cfg.nameEn}
                               </span>
-                              <span className="text-amber-300 text-[10px]">
-                                {row.specText}
+                              <span className="text-slate-400">
+                                ATK {formatCompact(h.attack)}
                               </span>
                             </div>
                             <div className="h-1.5 w-full rounded-sm bg-slate-900 overflow-hidden mt-0.5">
@@ -1571,15 +1430,14 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                       })}
                     </div>
 
-                    {/* T3 Era Perk: Squad Ultimate Charge Bar */}
                     {era.hasSquadUltimate && (
                       <div className="mt-2.5 pt-2 border-t border-slate-800/80">
                         <div className="flex items-center justify-between text-[11px] mb-1">
                           <span className="font-bold text-purple-300 flex items-center gap-1">
                             <Zap className="w-3 h-3 text-amber-400" />
                             {isZh
-                              ? `★ T3小队合击奥义 (${Math.floor(state.combat.ultimateCharge)}%)`
-                              : `★ T3 Squad Ultimate (${Math.floor(state.combat.ultimateCharge)}%)`}
+                              ? `合击技 (${Math.floor(state.combat.ultimateCharge)}%)`
+                              : `Ultimate (${Math.floor(state.combat.ultimateCharge)}%)`}
                           </span>
                           <button
                             onClick={onTriggerUltimate}
@@ -1590,7 +1448,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                                 : 'bg-slate-800 text-slate-500'
                             }`}
                           >
-                            {isZh ? '满100%自动释放 / 立即轰击' : 'Auto @ 100% / Cast'}
+                            {isZh ? '释放' : 'Cast'}
                           </button>
                         </div>
                         <div className="h-2 w-full rounded bg-slate-900 overflow-hidden border border-purple-500/40">
@@ -1607,13 +1465,13 @@ export const ControlDock: React.FC<ControlDockProps> = ({
 
                   <div className="mt-2 pt-2 border-t border-slate-800 text-[11px] font-mono text-slate-400 flex items-center justify-between">
                     <span>
-                      {isZh ? '小队有效秒伤:' : 'Effective DPS:'}{' '}
+                      DPS{' '}
                       <span className="text-sky-300 font-bold">
                         {formatCompact(pStats.totalDps)}/s
                       </span>
                     </span>
                     <span>
-                      {isZh ? '单波皮革掉落:' : 'Leather/Wave:'}{' '}
+                      {isZh ? '皮革' : 'Leather'}{' '}
                       <span className="text-emerald-400 font-bold">
                         +
                         {formatCompact(
@@ -1626,38 +1484,30 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                   </div>
                 </div>
 
-                {/* Col 3: Cooking Rations & Auto-Eat */}
+                {/* Col 3: Cooking Rations */}
                 <div className="rounded-lg border border-slate-800 bg-[#111827] p-3 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-white flex items-center gap-1">
                         <Utensils className="w-3.5 h-3.5 text-rose-400" />
-                        {isZh ? '烹饪料理补给栏' : 'Combat Rations & Buffs'}
+                        {isZh ? '料理补给' : 'Rations'}
                       </span>
                       {state.combat.activeBuffTimer > 0 && (
                         <span className="font-mono text-xs text-emerald-400">
-                          {isZh ? '全队料理增益:' : 'Buff:'}{' '}
                           {state.combat.activeBuffTimer.toFixed(0)}s
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {prog.unlockedActivities.cooking
-                        ? isZh
-                          ? '食用料理立即恢复小队 60% 生命，并赋予 30 秒全队战力暴涨！'
-                          : 'Eating restores 60% Squad HP & grants 30s All-Stat Surge!'
-                        : isZh
-                          ? '击败第1阶 Boss（S10）后将开启钓鱼与烹饪料理线，战斗中自动回血加攻！'
-                          : 'Defeat Zone 1 Boss (S10) to unlock Fishing & Cooking Rations!'}
-                    </p>
 
-                    <div className="mt-2 grid grid-cols-4 gap-1">
+                    <div className="mt-2.5 grid grid-cols-4 gap-1">
                       {TIERS.map((t) => {
                         const count = state.resources[`food_${t}`] || 0;
                         const isSelected = state.combat.selectedFoodTier === t;
+                        const isMasked = t > maxTier + 1;
                         return (
                           <button
                             key={t}
+                            disabled={isMasked}
                             onClick={() => onSelectAutoFoodTier(t)}
                             className={`px-1.5 py-1 rounded text-xs font-mono border transition-colors flex flex-col items-center ${
                               isSelected
@@ -1665,9 +1515,9 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                                 : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200'
                             }`}
                           >
-                            <span>T{t}</span>
+                            <span>{isMasked ? '？？' : `T${t}`}</span>
                             <span className="text-[10px] text-emerald-400">
-                              ×{formatCompact(count)}
+                              {isMasked ? '-' : `×${formatCompact(count)}`}
                             </span>
                           </button>
                         );
@@ -1677,9 +1527,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
 
                   <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
                     <span className="text-xs text-slate-400">
-                      {isZh
-                        ? 'HP < 55% 自动食用所选料理'
-                        : 'Auto-eats when HP < 55%'}
+                      {isZh ? '生命<55%自动食用' : 'Auto <55% HP'}
                     </span>
                     <button
                       onClick={() => onEatFood(state.combat.selectedFoodTier)}
@@ -1697,8 +1545,8 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                       }`}
                     >
                       {isZh
-                        ? `立即食用 T${state.combat.selectedFoodTier} 料理`
-                        : `Eat T${state.combat.selectedFoodTier} Ration`}
+                        ? `食用 T${state.combat.selectedFoodTier}`
+                        : `Eat T${state.combat.selectedFoodTier}`}
                     </button>
                   </div>
                 </div>
@@ -1706,26 +1554,22 @@ export const ControlDock: React.FC<ControlDockProps> = ({
             </div>
           )}
 
-          {/* TAB 5: ADVENTURING SQUAD & WAREHOUSE */}
+          {/* TAB 5: SQUAD & WAREHOUSE */}
           {state.activeTab === 'character' && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-display font-bold text-amber-300">
-                    {isZh
-                      ? `★ 已上阵小队品阶共鸣：当前 T${pStats.resonanceTier} 共鸣 (全队全属性 ×${pStats.resonanceMult.toFixed(2)} 倍)`
-                      : `★ Active Squad Tier Resonance: T${pStats.resonanceTier} (All Squad Stats ×${pStats.resonanceMult.toFixed(2)})`}
-                  </span>
-                </div>
-                <span className="text-slate-300 font-mono">
-                  {pStats.resonanceTier < 8
-                    ? isZh
-                      ? `短板部位：【${pStats.lowestSlotLabelZh}】→ 将已解锁队员装备全部升至 T${pStats.resonanceTier + 1} 可大幅提升共鸣倍率！`
-                      : `Bottleneck: [${pStats.lowestSlotLabelEn}] → Upgrade all active slots to T${pStats.resonanceTier + 1}!`
-                    : isZh
-                      ? '已达成最高 T8 星界神装共鸣！'
-                      : 'Max T8 Astral Squad Resonance Achieved!'}
+                <span className="font-display font-bold text-amber-300">
+                  {isZh
+                    ? `装备共鸣：T${pStats.resonanceTier} (全队属性 ×${pStats.resonanceMult.toFixed(2)})`
+                    : `Squad Resonance: T${pStats.resonanceTier} (×${pStats.resonanceMult.toFixed(2)})`}
                 </span>
+                {pStats.resonanceTier < 8 && (
+                  <span className="text-slate-300 font-mono">
+                    {isZh
+                      ? `最低部位：${pStats.lowestSlotLabelZh}`
+                      : `Lowest: ${pStats.lowestSlotLabelEn}`}
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
@@ -1741,19 +1585,18 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                         key={cls}
                         className="rounded-lg border border-slate-800/70 bg-slate-950/60 p-3 flex flex-col justify-center items-center text-center text-slate-500"
                       >
-                        <Lock className="w-5 h-5 mb-1 text-slate-600" />
+                        <Lock className="w-4 h-4 mb-1 text-slate-600" />
                         <div className="text-xs font-bold text-slate-400">
-                          {isZh ? cfg.nameZh : cfg.nameEn} ·{' '}
-                          {isZh ? cfg.roleTitleZh : cfg.roleTitleEn}
+                          {isZh ? cfg.nameZh : cfg.nameEn}
                         </div>
-                        <div className="text-[11px] mt-1">
+                        <div className="text-[11px] mt-0.5">
                           {cls === 'hunter'
                             ? isZh
-                              ? '推进至【第1阶 S3】战斗自动入队'
-                              : 'Unlocks at Zone 1 Stage 3'
+                              ? '解锁木工后打造猎人装备入队'
+                              : 'Craft Hunter gear after Carpentry'
                             : isZh
-                              ? '推进至【第1阶 S6】战斗自动入队'
-                              : 'Unlocks at Zone 1 Stage 6'}
+                              ? '解锁裁缝后打造法师装备入队'
+                              : 'Craft Mage gear after Tailoring'}
                         </div>
                       </div>
                     );
@@ -1766,14 +1609,9 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                     >
                       <div>
                         <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-2">
-                          <div>
-                            <span className="font-display text-sm font-bold text-white">
-                              {isZh ? cfg.nameZh : cfg.nameEn}
-                            </span>
-                            <span className="ml-1.5 text-[11px] text-amber-400">
-                              · {isZh ? cfg.roleTitleZh : cfg.roleTitleEn}
-                            </span>
-                          </div>
+                          <span className="font-display text-sm font-bold text-white">
+                            {isZh ? cfg.nameZh : cfg.nameEn}
+                          </span>
                           <span className="font-mono text-[11px] text-sky-300">
                             ATK {formatCompact(hStats.attack)}
                           </span>
@@ -1846,8 +1684,8 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <span className="text-xs font-bold text-white">
                       {isZh
-                        ? `装备背包 (${state.equipmentBag.length})`
-                        : `Equipment Bag (${state.equipmentBag.length})`}
+                        ? `背包 (${state.equipmentBag.length})`
+                        : `Bag (${state.equipmentBag.length})`}
                     </span>
                     {state.equipmentBag.length > 0 && (
                       <button
@@ -1862,9 +1700,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                   <div className="max-h-40 overflow-y-auto space-y-1.5">
                     {state.equipmentBag.length === 0 ? (
                       <div className="text-xs text-slate-500 py-6 text-center">
-                        {isZh
-                          ? '打造的装备若对应槽位为空将自动穿戴；多余装备存放在此处。'
-                          : 'Crafted gear auto-equips if slot is empty; extras appear here.'}
+                        {isZh ? '暂无多余装备' : 'Empty'}
                       </div>
                     ) : (
                       state.equipmentBag.map((item) => {
@@ -1910,9 +1746,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                   <div>
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                       <span className="text-xs font-bold text-white">
-                        {isZh
-                          ? '全品阶物资仓库 (基础原材料 / 通用耗材 / 稀有材料)'
-                          : 'Global Material & Consumable Warehouse'}
+                        {isZh ? '物资仓库' : 'Warehouse'}
                       </span>
                       <div className="flex items-center gap-1">
                         {(['all', 'raw', 'refined', 'rare'] as const).map(
@@ -1928,7 +1762,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                             >
                               {f === 'all' && (isZh ? '全部' : 'All')}
                               {f === 'raw' && (isZh ? '原材料' : 'Raw')}
-                              {f === 'refined' && (isZh ? '耗材' : 'Refined')}
+                              {f === 'refined' && (isZh ? '加工品' : 'Refined')}
                               {f === 'rare' && (isZh ? '稀有' : 'Rare')}
                             </button>
                           )
@@ -1956,7 +1790,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                                   {isZh ? '鱼类' : 'Fish'}
                                 </th>
                                 <th className="py-1 px-2">
-                                  {isZh ? '纤维' : 'Fiber'}
+                                  {isZh ? '草药' : 'Herb'}
                                 </th>
                                 <th className="py-1 px-2">
                                   {isZh ? '皮革' : 'Leather'}
@@ -1983,71 +1817,89 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 font-mono tabular-nums">
-                          {TIERS.map((t) => (
-                            <tr key={t} className="hover:bg-slate-900/50">
-                              <td className="py-1 px-2 font-sans font-semibold text-slate-200">
-                                T{t}{' '}
-                                {isZh
-                                  ? TIER_META[t].prefixZh
-                                  : TIER_META[t].prefixEn}
-                              </td>
-                              {(warehouseFilter === 'all' ||
-                                warehouseFilter === 'raw') && (
-                                <>
-                                  <td className="py-1 px-2 text-amber-300">
-                                    {formatCompact(
-                                      state.resources[`ore_${t}`] || 0
-                                    )}
-                                  </td>
-                                  <td className="py-1 px-2 text-emerald-300">
-                                    {formatCompact(
-                                      state.resources[`wood_${t}`] || 0
-                                    )}
-                                  </td>
-                                  <td className="py-1 px-2 text-sky-300">
-                                    {formatCompact(
-                                      state.resources[`fish_${t}`] || 0
-                                    )}
-                                  </td>
-                                  <td className="py-1 px-2 text-pink-300">
-                                    {formatCompact(
-                                      state.resources[`fiber_${t}`] || 0
-                                    )}
-                                  </td>
-                                  <td className="py-1 px-2 text-orange-300">
-                                    {formatCompact(
-                                      state.resources[`leather_${t}`] || 0
-                                    )}
-                                  </td>
-                                </>
-                              )}
-                              {(warehouseFilter === 'all' ||
-                                warehouseFilter === 'refined') && (
-                                <>
-                                  <td className="py-1 px-2 text-amber-400">
-                                    {formatCompact(
-                                      state.resources[`ingot_${t}`] || 0
-                                    )}
-                                  </td>
-                                  <td className="py-1 px-2 text-lime-300">
-                                    {formatCompact(
-                                      state.resources[`plank_${t}`] || 0
-                                    )}
-                                  </td>
-                                  <td className="py-1 px-2 text-purple-300">
-                                    {formatCompact(
-                                      state.resources[`cloth_${t}`] || 0
-                                    )}
-                                  </td>
-                                  <td className="py-1 px-2 text-rose-300">
-                                    {formatCompact(
-                                      state.resources[`food_${t}`] || 0
-                                    )}
-                                  </td>
-                                </>
-                              )}
-                            </tr>
-                          ))}
+                          {TIERS.map((t) => {
+                            const isMasked = t > maxTier + 1;
+                            return (
+                              <tr key={t} className="hover:bg-slate-900/50">
+                                <td className="py-1 px-2 font-sans font-semibold text-slate-200">
+                                  {getTierLabel(t)}
+                                </td>
+                                {(warehouseFilter === 'all' ||
+                                  warehouseFilter === 'raw') && (
+                                  <>
+                                    <td className="py-1 px-2 text-amber-300">
+                                      {isMasked
+                                        ? '-'
+                                        : formatCompact(
+                                            state.resources[`ore_${t}`] || 0
+                                          )}
+                                    </td>
+                                    <td className="py-1 px-2 text-emerald-300">
+                                      {isMasked
+                                        ? '-'
+                                        : formatCompact(
+                                            state.resources[`wood_${t}`] || 0
+                                          )}
+                                    </td>
+                                    <td className="py-1 px-2 text-sky-300">
+                                      {isMasked
+                                        ? '-'
+                                        : formatCompact(
+                                            state.resources[`fish_${t}`] || 0
+                                          )}
+                                    </td>
+                                    <td className="py-1 px-2 text-pink-300">
+                                      {isMasked
+                                        ? '-'
+                                        : formatCompact(
+                                            state.resources[`fiber_${t}`] || 0
+                                          )}
+                                    </td>
+                                    <td className="py-1 px-2 text-orange-300">
+                                      {isMasked
+                                        ? '-'
+                                        : formatCompact(
+                                            state.resources[`leather_${t}`] || 0
+                                          )}
+                                    </td>
+                                  </>
+                                )}
+                                {(warehouseFilter === 'all' ||
+                                  warehouseFilter === 'refined') && (
+                                  <>
+                                    <td className="py-1 px-2 text-amber-400">
+                                      {isMasked
+                                        ? '-'
+                                        : formatCompact(
+                                            state.resources[`ingot_${t}`] || 0
+                                          )}
+                                    </td>
+                                    <td className="py-1 px-2 text-lime-300">
+                                      {isMasked
+                                        ? '-'
+                                        : formatCompact(
+                                            state.resources[`plank_${t}`] || 0
+                                          )}
+                                    </td>
+                                    <td className="py-1 px-2 text-purple-300">
+                                      {isMasked
+                                        ? '-'
+                                        : formatCompact(
+                                            state.resources[`cloth_${t}`] || 0
+                                          )}
+                                    </td>
+                                    <td className="py-1 px-2 text-rose-300">
+                                      {isMasked
+                                        ? '-'
+                                        : formatCompact(
+                                            state.resources[`food_${t}`] || 0
+                                          )}
+                                    </td>
+                                  </>
+                                )}
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -2057,7 +1909,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
             </div>
           )}
 
-          {/* TAB 6: SHOP & AUTO-SELL CONFIGURATION */}
+          {/* TAB 6: SHOP */}
           {state.activeTab === 'shop' && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-500/40 bg-emerald-950/20 px-4 py-2.5 text-xs">
@@ -2075,15 +1927,19 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                         : 'bg-slate-800 text-slate-400'
                     }`}
                   >
-                    {isZh ? '自动卖出总开关:' : 'Auto-Sell Master:'}{' '}
-                    {state.autoSell.enabled ? 'ON' : 'OFF'}
+                    {isZh ? '自动卖出:' : 'Auto-Sell:'}{' '}
+                    {state.autoSell.enabled
+                      ? isZh
+                        ? '开启'
+                        : 'ON'
+                      : isZh
+                        ? '关闭'
+                        : 'OFF'}
                   </button>
 
                   <div className="flex items-center gap-1.5">
                     <span className="text-slate-300 font-semibold">
-                      {isZh
-                        ? '库存保留线 (超出部分每秒自动变现):'
-                        : 'Stock Reserve:'}
+                      {isZh ? '保留库存:' : 'Reserve:'}
                     </span>
                     {[0, 20, 50, 100, 300].map((val) => (
                       <button
@@ -2109,7 +1965,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5">
                     <span className="text-slate-300">
-                      {isZh ? '低阶装备自动卖出:' : 'Auto-Sell Gear:'}
+                      {isZh ? '低阶装备:' : 'Gear:'}
                     </span>
                     <select
                       value={state.autoSell.autoSellEquipmentBelowTier}
@@ -2121,26 +1977,23 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                       }
                       className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-amber-300 font-mono"
                     >
-                      <option value={0}>
-                        {isZh ? '不自动卖装备' : 'Off'}
-                      </option>
+                      <option value={0}>{isZh ? '保留' : 'Keep'}</option>
                       {[2, 3, 4, 5, 6, 7, 8, 9].map((t) => (
                         <option key={t} value={t}>
                           {t === 9
                             ? isZh
-                              ? '自动卖全部非神话装备'
-                              : 'All Non-Mythic'
+                              ? '卖出全部普通装备'
+                              : 'All Normal'
                             : isZh
-                              ? `自动卖 < T${t} 装备`
-                              : `Below T${t}`}
+                              ? `卖出 < T${t}`
+                              : `< T${t}`}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <span className="font-mono text-emerald-400 font-bold">
-                    <Coins className="w-3.5 h-3.5 inline mr-1" />
-                    {isZh ? '自动卖出收益:' : 'Auto-Sell:'} +
+                    <Coins className="w-3.5 h-3.5 inline mr-1" />+
                     {formatCompact(state.lastAutoSellGoldPerSec)} G/s
                   </span>
                 </div>
@@ -2148,18 +2001,9 @@ export const ControlDock: React.FC<ControlDockProps> = ({
 
               <div className="rounded-lg border border-slate-800 bg-[#111827] p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-                  <div>
-                    <h4 className="text-xs font-bold text-white">
-                      {isZh
-                        ? '各品阶【原材料】与【二级加工产物】自动卖出配置表'
-                        : 'Per-Tier Raw Materials & Refined Products Auto-Sell Matrix'}
-                    </h4>
-                    <p className="text-[11px] text-slate-400">
-                      {isZh
-                        ? '升级到高品阶后，低品阶已雇佣的 NPC 会继续在后台生产。勾选下方对应品阶的自动卖出，即可将淘汰品阶产线转化为全天候自动印钞机！'
-                        : 'Lower-tier NPCs keep working forever! Enable Auto-Sell on lower tiers to turn them into permanent automated Gold factories!'}
-                    </p>
-                  </div>
+                  <h4 className="text-xs font-bold text-white">
+                    {isZh ? '按品阶自动卖出' : 'Auto-Sell by Tier'}
+                  </h4>
 
                   <div className="flex items-center gap-2">
                     <button
@@ -2168,8 +2012,10 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                           const nextRaw = { ...prev.sellRawByTier };
                           const nextRef = { ...prev.sellRefinedByTier };
                           for (const t of TIERS) {
-                            nextRaw[t] = true;
-                            nextRef[t] = true;
+                            if (t <= maxTier) {
+                              nextRaw[t] = true;
+                              nextRef[t] = true;
+                            }
                           }
                           return {
                             ...prev,
@@ -2181,7 +2027,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                       }
                       className="px-2.5 py-1 rounded bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500"
                     >
-                      {isZh ? '全部开启自动卖出' : 'Enable All Tiers'}
+                      {isZh ? '全部开启' : 'Enable All'}
                     </button>
                     <button
                       onClick={() =>
@@ -2208,7 +2054,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                   {TIERS.map((t) => {
-                    const meta = TIER_META[t];
+                    const isMasked = t > maxTier + 1;
                     const rawOn = state.autoSell.sellRawByTier[t];
                     const refOn = state.autoSell.sellRefinedByTier[t];
                     const rawPrice = getResourceUnitPrice(`ore_${t}`);
@@ -2221,14 +2067,12 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                       >
                         <div className="flex items-center justify-between border-b border-slate-800 pb-1">
                           <span className="font-bold text-xs text-white">
-                            T{t} {isZh ? meta.prefixZh : meta.prefixEn}
-                          </span>
-                          <span className="font-mono text-[10px] text-amber-400">
-                            ×{formatCompact(meta.baseMultiplier)}
+                            {getTierLabel(t)}
                           </span>
                         </div>
 
                         <button
+                          disabled={isMasked}
                           onClick={() =>
                             onUpdateAutoSell((prev) => ({
                               ...prev,
@@ -2239,21 +2083,26 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                             }))
                           }
                           className={`w-full py-1.5 px-2 rounded text-left text-[11px] font-medium border transition-colors ${
-                            rawOn
-                              ? 'border-emerald-500/70 bg-emerald-500/20 text-emerald-200'
-                              : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
+                            isMasked
+                              ? 'border-slate-900 bg-slate-950 text-slate-600 cursor-not-allowed'
+                              : rawOn
+                                ? 'border-emerald-500/70 bg-emerald-500/20 text-emerald-200'
+                                : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
                           }`}
                         >
                           <div className="flex items-center justify-between font-bold">
-                            <span>{isZh ? '卖原材料' : 'Sell Raw'}</span>
-                            <span>{rawOn ? 'ON' : 'OFF'}</span>
+                            <span>{isZh ? '原材料' : 'Raw'}</span>
+                            <span>{isMasked ? '？？' : rawOn ? 'ON' : 'OFF'}</span>
                           </div>
-                          <div className="font-mono text-[10px] text-amber-400 mt-0.5">
-                            {formatCompact(rawPrice)} G/{isZh ? '个' : 'ea'}
-                          </div>
+                          {!isMasked && (
+                            <div className="font-mono text-[10px] text-amber-400 mt-0.5">
+                              {formatCompact(rawPrice)} G
+                            </div>
+                          )}
                         </button>
 
                         <button
+                          disabled={isMasked}
                           onClick={() =>
                             onUpdateAutoSell((prev) => ({
                               ...prev,
@@ -2264,18 +2113,22 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                             }))
                           }
                           className={`w-full py-1.5 px-2 rounded text-left text-[11px] font-medium border transition-colors ${
-                            refOn
-                              ? 'border-amber-500/70 bg-amber-500/20 text-amber-200'
-                              : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
+                            isMasked
+                              ? 'border-slate-900 bg-slate-950 text-slate-600 cursor-not-allowed'
+                              : refOn
+                                ? 'border-amber-500/70 bg-amber-500/20 text-amber-200'
+                                : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
                           }`}
                         >
                           <div className="flex items-center justify-between font-bold">
-                            <span>{isZh ? '卖加工品' : 'Sell Refined'}</span>
-                            <span>{refOn ? 'ON' : 'OFF'}</span>
+                            <span>{isZh ? '加工品' : 'Refined'}</span>
+                            <span>{isMasked ? '？？' : refOn ? 'ON' : 'OFF'}</span>
                           </div>
-                          <div className="font-mono text-[10px] text-amber-400 mt-0.5">
-                            {formatCompact(refPrice)} G/{isZh ? '个' : 'ea'}
-                          </div>
+                          {!isMasked && (
+                            <div className="font-mono text-[10px] text-amber-400 mt-0.5">
+                              {formatCompact(refPrice)} G
+                            </div>
+                          )}
                         </button>
                       </div>
                     );
@@ -2288,30 +2141,21 @@ export const ControlDock: React.FC<ControlDockProps> = ({
           {/* TAB 7: FISHBONE ALTAR */}
           {state.activeTab === 'altar' && (
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cyan-900/60 bg-cyan-950/25 px-3.5 py-2.5">
-                <div>
-                  <h3 className="font-display text-sm font-bold text-cyan-300">
-                    {isZh
-                      ? '远古鱼骨圣坛 · 二级货币永久指数增幅'
-                      : 'Ancient Fishbone Altar · Exponential Global Multipliers'}
-                  </h3>
-                  <p className="text-xs text-slate-300">
-                    {isZh
-                      ? '通过【钓鱼】与【战斗】获取鱼骨头，永久倍增全品阶速度、产量、小队战力与商会售价！'
-                      : 'Obtain Fishbones from Fishing & Combat to permanently multiply Speed, Yield & Squad Power!'}
-                  </p>
-                </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cyan-900/60 bg-cyan-950/25 px-3.5 py-2">
+                <h3 className="font-display text-sm font-bold text-cyan-300">
+                  {isZh ? '鱼骨圣坛' : 'Fishbone Altar'}
+                </h3>
                 <div className="font-mono text-xs text-cyan-300 flex items-center gap-4">
                   <span>
-                    {isZh ? '全局速度:' : 'Speed:'} ×
+                    {isZh ? '速度' : 'Speed'} ×
                     {fbMultipliers.speedMult.toFixed(2)}
                   </span>
                   <span>
-                    {isZh ? '全局产量:' : 'Yield:'} ×
+                    {isZh ? '产量' : 'Yield'} ×
                     {formatCompact(fbMultipliers.yieldMult)}
                   </span>
                   <span>
-                    {isZh ? '小队战力:' : 'Power:'} ×
+                    {isZh ? '战力' : 'Power'} ×
                     {formatCompact(fbMultipliers.combatMult)}
                   </span>
                 </div>
@@ -2334,9 +2178,9 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                           <span className="truncate">
                             {isZh ? up.nameZh : up.nameEn}
                           </span>
-                        </div>
-                        <div className="font-mono text-xs text-slate-400 mt-0.5">
-                          Lv.{lv} / {up.maxLevel}
+                          <span className="font-mono text-slate-400">
+                            {lv}/{up.maxLevel}
+                          </span>
                         </div>
                         <p className="text-xs text-slate-300 mt-1.5">
                           {isZh ? up.descZh : up.descEn}
@@ -2355,10 +2199,8 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                         }`}
                       >
                         {isMax
-                          ? isZh
-                            ? '已满级 MAX'
-                            : 'MAXED'
-                          : `${formatCompact(cost)} ${isZh ? '鱼骨头' : 'Fishbones'}`}
+                          ? 'MAX'
+                          : `${formatCompact(cost)} ${isZh ? '鱼骨' : 'Bones'}`}
                       </button>
                     </div>
                   );
@@ -2367,187 +2209,171 @@ export const ControlDock: React.FC<ControlDockProps> = ({
             </div>
           )}
 
-          {/* TAB 8: ERA PARADIGM PERKS (T1-T8) & ENDGAME MONUMENT OF ETERNAL SLACKING */}
+          {/* TAB 8: ERA RULES & ENDGAME (Endgame section only shown when T8 is unlocked!) */}
           {state.activeTab === 'monument' && (
             <div className="space-y-3">
-              {/* Top Row: T8 Overdrive Switch & Endgame Monument Builder */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-                {/* Left: T8 Overdrive Carnival Switch */}
-                <div className="lg:col-span-5 rounded-lg border border-purple-500/50 bg-gradient-to-br from-purple-950/40 via-[#111827] to-amber-950/30 p-3.5 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-display text-sm font-bold text-amber-300 flex items-center gap-1.5">
-                        <Flame className="w-4 h-4 text-rose-400" />
+              {/* Only show T8 Overdrive & Monument when T8 is unlocked */}
+              {era.highestEraTier >= 8 && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                  <div className="lg:col-span-5 rounded-lg border border-purple-500/50 bg-gradient-to-br from-purple-950/40 via-[#111827] to-amber-950/30 p-3.5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-display text-sm font-bold text-amber-300 flex items-center gap-1.5">
+                          <Flame className="w-4 h-4 text-rose-400" />
+                          {isZh ? '星界超载' : 'Astral Overdrive'}
+                        </h3>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1.5">
                         {isZh
-                          ? 'T8 终局狂欢 · 星界百倍超载模式'
-                          : 'T8 Endgame · Astral 100x Overdrive'}
-                      </h3>
-                      <span className="font-mono text-[11px] text-purple-300">
-                        {era.hasAstralOverdrive
-                          ? isZh
-                            ? '已解锁'
-                            : 'UNLOCKED'
-                          : isZh
-                            ? '需解锁任意 T8 产线'
-                            : 'Requires T8'}
-                      </span>
+                          ? '全品阶产量 ×100，小队攻击与金币 ×250，攻速 ×300%。'
+                          : 'Yield ×100, Squad ATK & Gold ×250, Attack Speed ×300%.'}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-300 mt-1.5">
-                      {isZh
-                        ? '开启后全服进入终局爽感狂飙状态：所有采集与加工产量 ×100 倍、小队攻击力与金币掉落 ×250 倍、全小队攻速 ×300%！'
-                        : 'Multiplies all Gathering & Refining yields by 100x, Squad ATK & Gold by 250x, and Attack Speed by 300%!'}
-                    </p>
-                  </div>
 
-                  <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs text-amber-300">
-                      {prog.overdriveActive
-                        ? isZh
-                          ? '★ 超载引擎全功率运转中！'
-                          : '★ OVERDRIVE ACTIVE!'
-                        : isZh
-                          ? '状态：常态运转'
-                          : 'Status: Normal'}
-                    </span>
-                    <button
-                      disabled={!era.hasAstralOverdrive}
-                      onClick={onToggleOverdrive}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        !era.hasAstralOverdrive
-                          ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                          : prog.overdriveActive
-                            ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-purple-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                    <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs text-amber-300">
+                        {prog.overdriveActive
+                          ? isZh
+                            ? '超载运转中'
+                            : 'Active'
+                          : isZh
+                            ? '未开启'
+                            : 'Idle'}
+                      </span>
+                      <button
+                        onClick={onToggleOverdrive}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          prog.overdriveActive
+                            ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-purple-500 text-slate-950'
                             : 'bg-purple-600 text-white hover:bg-purple-500'
-                      }`}
-                    >
-                      {prog.overdriveActive
-                        ? isZh
-                          ? '★ 星界超载已开启 (点击关闭)'
-                          : '★ Overdrive ON'
-                        : isZh
-                          ? '⚡ 开启百倍星界超载'
-                          : '⚡ Activate Overdrive'}
-                    </button>
+                        }`}
+                      >
+                        {prog.overdriveActive
+                          ? isZh
+                            ? '关闭超载'
+                            : 'Turn Off'
+                          : isZh
+                            ? '开启超载'
+                            : 'Turn On'}
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Right: 3-Stage Monument of Eternal Slacking */}
-                <div className="lg:col-span-7 rounded-lg border border-amber-500/50 bg-[#111827] p-3.5 flex flex-col justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="font-display text-sm font-bold text-white flex items-center gap-1.5">
-                        <Crown className="w-4 h-4 text-amber-400" />
-                        {isZh
-                          ? `终局奇观 · 创世摸鱼神碑 (当前进度: ${prog.monumentStage}/3 阶段)`
-                          : `Endgame Wonder · Monument of Eternal Slacking (${prog.monumentStage}/3)`}
-                      </h3>
-                      {prog.monumentStage >= 3 && (
-                        <button
-                          onClick={onOpenVictoryModal}
-                          className="px-2.5 py-1 rounded bg-amber-500 text-slate-950 text-xs font-bold hover:bg-amber-400"
-                        >
-                          {isZh ? '★ 查看通关荣誉证书' : '★ Victory Certificate'}
-                        </button>
+                  <div className="lg:col-span-7 rounded-lg border border-amber-500/50 bg-[#111827] p-3.5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="font-display text-sm font-bold text-white flex items-center gap-1.5">
+                          <Crown className="w-4 h-4 text-amber-400" />
+                          {isZh
+                            ? `摸鱼神碑 (${prog.monumentStage}/3)`
+                            : `Monument (${prog.monumentStage}/3)`}
+                        </h3>
+                        {prog.monumentStage >= 3 && (
+                          <button
+                            onClick={onOpenVictoryModal}
+                            className="px-2.5 py-1 rounded bg-amber-500 text-slate-950 text-xs font-bold hover:bg-amber-400"
+                          >
+                            {isZh ? '通关证书' : 'Certificate'}
+                          </button>
+                        )}
+                      </div>
+
+                      {prog.monumentStage < 3 ? (
+                        (() => {
+                          const nextStageNum = (prog.monumentStage + 1) as
+                            | 1
+                            | 2
+                            | 3;
+                          const stgInfo = MONUMENT_STAGES[nextStageNum - 1];
+                          const canBuild = canAffordMonumentStage(
+                            state,
+                            nextStageNum
+                          );
+                          return (
+                            <div className="mt-2">
+                              <div className="text-xs font-bold text-amber-300">
+                                {isZh ? stgInfo.nameZh : stgInfo.nameEn} ·{' '}
+                                <span className="font-normal text-slate-300">
+                                  {isZh ? stgInfo.descZh : stgInfo.descEn}
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded border border-slate-800 bg-slate-900/90 px-3 py-2 text-xs font-mono">
+                                <span
+                                  className={
+                                    state.gold >= stgInfo.goldCost
+                                      ? 'text-emerald-400'
+                                      : 'text-rose-400'
+                                  }
+                                >
+                                  {formatCompact(state.gold)} /{' '}
+                                  {formatCompact(stgInfo.goldCost)} G
+                                </span>
+                                <span
+                                  className={
+                                    state.fishbones >= stgInfo.fishboneCost
+                                      ? 'text-emerald-400'
+                                      : 'text-rose-400'
+                                  }
+                                >
+                                  {isZh ? '鱼骨' : 'Bones'}:{' '}
+                                  {formatCompact(state.fishbones)} /{' '}
+                                  {formatCompact(stgInfo.fishboneCost)}
+                                </span>
+                                {stgInfo.inputs.map((inp, idx) => {
+                                  const have =
+                                    state.resources[inp.itemKey] || 0;
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className={
+                                        have >= inp.amount
+                                          ? 'text-emerald-400'
+                                          : 'text-rose-400'
+                                      }
+                                    >
+                                      {getResourceName(
+                                        inp.itemKey,
+                                        state.language
+                                      )}
+                                      : {formatCompact(have)}/{inp.amount}
+                                    </span>
+                                  );
+                                })}
+                                <button
+                                  disabled={!canBuild}
+                                  onClick={onBuildMonumentStage}
+                                  className={`px-3.5 py-1 rounded font-sans font-bold transition-colors ${
+                                    canBuild
+                                      ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                  }`}
+                                >
+                                  {isZh ? '建造' : 'Build'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="mt-2 rounded border border-amber-500/50 bg-amber-500/15 p-2.5 text-xs text-amber-200">
+                          {isZh ? '摸鱼神碑已全部建成。' : 'Monument complete.'}
+                        </div>
                       )}
                     </div>
-
-                    {prog.monumentStage < 3 ? (
-                      (() => {
-                        const nextStageNum = (prog.monumentStage + 1) as
-                          | 1
-                          | 2
-                          | 3;
-                        const stgInfo = MONUMENT_STAGES[nextStageNum - 1];
-                        const canBuild = canAffordMonumentStage(
-                          state,
-                          nextStageNum
-                        );
-                        return (
-                          <div className="mt-2">
-                            <div className="text-xs font-bold text-amber-300">
-                              {isZh ? stgInfo.nameZh : stgInfo.nameEn} —{' '}
-                              <span className="font-normal text-slate-300">
-                                {isZh ? stgInfo.descZh : stgInfo.descEn}
-                              </span>
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded border border-slate-800 bg-slate-900/90 px-3 py-2 text-xs font-mono">
-                              <span
-                                className={
-                                  state.gold >= stgInfo.goldCost
-                                    ? 'text-emerald-400'
-                                    : 'text-rose-400'
-                                }
-                              >
-                                {isZh ? '金币:' : 'Gold:'}{' '}
-                                {formatCompact(state.gold)} /{' '}
-                                {formatCompact(stgInfo.goldCost)}
-                              </span>
-                              <span
-                                className={
-                                  state.fishbones >= stgInfo.fishboneCost
-                                    ? 'text-emerald-400'
-                                    : 'text-rose-400'
-                                }
-                              >
-                                {isZh ? '鱼骨:' : 'Fishbones:'}{' '}
-                                {formatCompact(state.fishbones)} /{' '}
-                                {formatCompact(stgInfo.fishboneCost)}
-                              </span>
-                              {stgInfo.inputs.map((inp, idx) => {
-                                const have = state.resources[inp.itemKey] || 0;
-                                return (
-                                  <span
-                                    key={idx}
-                                    className={
-                                      have >= inp.amount
-                                        ? 'text-emerald-400'
-                                        : 'text-rose-400'
-                                    }
-                                  >
-                                    {getResourceName(
-                                      inp.itemKey,
-                                      state.language
-                                    )}
-                                    : {formatCompact(have)}/{inp.amount}
-                                  </span>
-                                );
-                              })}
-                              <button
-                                disabled={!canBuild}
-                                onClick={onBuildMonumentStage}
-                                className={`px-3.5 py-1 rounded font-sans font-bold transition-colors ${
-                                  canBuild
-                                    ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                                }`}
-                              >
-                                {isZh
-                                  ? `筑造第 ${nextStageNum} 阶段神碑`
-                                  : `Build Stage ${nextStageNum}`}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="mt-2 rounded border border-amber-500/50 bg-amber-500/15 p-2.5 text-xs text-amber-200">
-                        {isZh
-                          ? '★ 恭喜！【创世摸鱼神碑】已圆满落成屹立于浮空岛中央！全服永久享受神碑创世加成，您已登顶摸鱼之神！'
-                          : '★ The Monument of Eternal Slacking stands complete in the 3D realm! You have beaten the game!'}
-                      </div>
-                    )}
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Bottom Grid: T1-T8 Era Perks Overview */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              {/* Era Perks Grid: Unlocked show full details; Next tier (e.g. T2) shows name + ??; Higher tiers show ?? */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {ERA_PERKS.map((perk) => {
-                  const unlocked = era.highestEraTier >= perk.tier;
+                  const unlocked = perk.tier <= maxTier;
+                  const isNext = perk.tier === maxTier + 1;
+
                   return (
                     <div
                       key={perk.tier}
-                      className={`rounded-lg border p-2.5 flex flex-col justify-between ${
+                      className={`rounded-lg border p-3 flex flex-col justify-between ${
                         unlocked
                           ? 'border-amber-500/50 bg-slate-900/95 text-slate-100'
                           : 'border-slate-800/70 bg-slate-950/60 text-slate-500'
@@ -2557,10 +2383,18 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                         <div className="flex items-center justify-between text-xs font-bold">
                           <span
                             className={
-                              unlocked ? 'text-amber-400' : 'text-slate-500'
+                              unlocked
+                                ? 'text-amber-400'
+                                : isNext
+                                  ? 'text-slate-300'
+                                  : 'text-slate-600'
                             }
                           >
-                            {isZh ? perk.eraNameZh : perk.eraNameEn}
+                            {unlocked || isNext
+                              ? isZh
+                                ? perk.eraNameZh
+                                : perk.eraNameEn
+                              : `T${perk.tier} ？？`}
                           </span>
                           <span
                             className={`font-mono text-[10px] px-1.5 py-0.2 rounded ${
@@ -2571,20 +2405,30 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                           >
                             {unlocked
                               ? isZh
-                                ? '已激活'
-                                : 'ACTIVE'
+                                ? '已解锁'
+                                : 'Active'
                               : isZh
-                                ? `解锁T${perk.tier}激活`
-                                : `Locked T${perk.tier}`}
+                                ? '未解锁'
+                                : 'Locked'}
                           </span>
                         </div>
                         <div
-                          className={`text-xs font-bold mt-1 ${unlocked ? 'text-white' : 'text-slate-400'}`}
+                          className={`text-xs font-bold mt-1.5 ${
+                            unlocked ? 'text-white' : 'text-slate-500'
+                          }`}
                         >
-                          {isZh ? perk.perkTitleZh : perk.perkTitleEn}
+                          {unlocked
+                            ? isZh
+                              ? perk.perkTitleZh
+                              : perk.perkTitleEn
+                            : '？？'}
                         </div>
-                        <p className="text-[11px] mt-1 leading-relaxed">
-                          {isZh ? perk.perkDescZh : perk.perkDescEn}
+                        <p className="text-[11px] mt-1 leading-relaxed text-slate-400">
+                          {unlocked
+                            ? isZh
+                              ? perk.perkDescZh
+                              : perk.perkDescEn
+                            : '？？'}
                         </p>
                       </div>
                     </div>

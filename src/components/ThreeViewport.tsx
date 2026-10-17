@@ -1427,30 +1427,41 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
     warriorSlashMesh.position.set(0.6, 1.1, -3.2);
     scene.add(warriorSlashMesh);
 
-    // 2. Hunter 3D Arrow Projectile
+    // 2. Hunter 3D Arrow Projectile (Strictly pointing toward +X along flight path)
     const hunterArrowGroup = new THREE.Group();
+    hunterArrowGroup.rotation.order = 'YZX';
     const arrowShaft = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.025, 0.025, 1.1, 6),
-      new THREE.MeshStandardMaterial({ color: 0xfde68a })
+      new THREE.CylinderGeometry(0.028, 0.028, 1.15, 8),
+      new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.4 })
     );
     arrowShaft.rotation.z = -Math.PI / 2;
+
+    // Prominent forward-pointing arrowhead at +X (rotation.z = -Math.PI/2 sends Cone +Y tip to +X)
     const arrowHead = new THREE.Mesh(
-      new THREE.ConeGeometry(0.085, 0.3, 6),
+      new THREE.ConeGeometry(0.12, 0.42, 4),
       new THREE.MeshBasicMaterial({ color: 0x34d399 })
     );
     arrowHead.rotation.z = -Math.PI / 2;
-    arrowHead.position.x = 0.62;
-    const arrowTrail = new THREE.Mesh(
-      new THREE.ConeGeometry(0.15, 0.7, 8),
-      new THREE.MeshBasicMaterial({
-        color: 0x10b981,
-        transparent: true,
-        opacity: 0.78,
-      })
+    arrowHead.rotation.x = Math.PI / 4;
+    arrowHead.position.x = 0.72;
+
+    // Crossed flat fletching feathers at tail (-X), narrow in front and flaring toward back
+    const featherMat = new THREE.MeshBasicMaterial({
+      color: 0x10b981,
+      side: THREE.DoubleSide,
+    });
+    const featherFinH = new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 0.015, 0.14),
+      featherMat
     );
-    arrowTrail.rotation.z = Math.PI / 2;
-    arrowTrail.position.x = -0.36;
-    hunterArrowGroup.add(arrowShaft, arrowHead, arrowTrail);
+    featherFinH.position.x = -0.48;
+    const featherFinV = new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 0.14, 0.015),
+      featherMat
+    );
+    featherFinV.position.x = -0.48;
+
+    hunterArrowGroup.add(arrowShaft, arrowHead, featherFinH, featherFinV);
     hunterArrowGroup.visible = false;
     scene.add(hunterArrowGroup);
 
@@ -2372,11 +2383,25 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
       if (hunterUnlocked && hPulse > 0.04) {
         hunterArrowGroup.visible = true;
         const tProj = 1 - hPulse;
+        const x0 = hunterHero.baseX + 0.65;
+        const y0 = 1.42;
+        const z0 = hunterHero.baseZ;
+        const x1 = 1.85;
+        const y1 = 1.32;
+        const z1 = -3.2;
+
         hunterArrowGroup.position.set(
-          THREE.MathUtils.lerp(hunterHero.baseX + 0.65, 1.85, tProj),
-          1.42 + Math.sin(tProj * Math.PI) * 0.32,
-          THREE.MathUtils.lerp(hunterHero.baseZ, -3.2, tProj)
+          THREE.MathUtils.lerp(x0, x1, tProj),
+          THREE.MathUtils.lerp(y0, y1, tProj) +
+            Math.sin(tProj * Math.PI) * 0.32,
+          THREE.MathUtils.lerp(z0, z1, tProj)
         );
+
+        const vx = x1 - x0;
+        const vz = z1 - z0;
+        const vy = y1 - y0 + Math.cos(tProj * Math.PI) * Math.PI * 0.32;
+        hunterArrowGroup.rotation.y = Math.atan2(-vz, vx);
+        hunterArrowGroup.rotation.z = Math.atan2(vy, Math.hypot(vx, vz));
       } else {
         hunterArrowGroup.visible = false;
       }
